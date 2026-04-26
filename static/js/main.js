@@ -274,9 +274,9 @@ async function abrirModalAtencion(reservaId, pacienteId) {
 
 function cerrarModalAtencion() {
     document.getElementById('modal-atencion').style.display = 'none';
-    document.getElementById('form-atencion').reset();
+    document.getElementById('atencion-actividades').value = '';
+    document.getElementById('atencion-monto').value = '';
 }
-
 async function finalizarAtencion() {
     const form = document.getElementById('form-atencion');
     const data = {

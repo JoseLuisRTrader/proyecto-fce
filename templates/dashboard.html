@@ -96,25 +96,25 @@
         </div>
     </div>
     <div id="modal-atencion" class="modal-overlay">
-    <div class="modal-content modal-fullscreen">
-        <header class="atencion-header-pro">
-            <div class="atencion-perfil-wrapper">
-                <img id="atencion-foto" src="" class="avatar-grande" alt="Foto Paciente">
-                <div class="atencion-datos-principales">
-                    <h2 id="atencion-nombre-paciente">Nombre del Paciente</h2>
-                    <div class="tags-atencion">
-                        <span class="tag">🎂 <span id="atencion-edad">--</span> años</span>
-                        <span class="tag">📋 <span id="atencion-diagnostico">--</span></span>
-                        <span class="tag">👤 Tutor: <span id="atencion-tutor">--</span></span>
+        <div class="modal-content modal-fullscreen">
+
+            <header class="atencion-header-pro">
+                <div class="atencion-perfil-wrapper">
+                    <img id="atencion-foto" src="" class="avatar-grande" alt="Foto Paciente">
+                    <div class="atencion-datos-principales">
+                        <h2 id="atencion-nombre-paciente">Nombre del Paciente</h2>
+                        <div class="tags-atencion">
+                            <span class="tag">🎂 <span id="atencion-edad">--</span> años</span>
+                            <span class="tag">📋 <span id="atencion-diagnostico">--</span></span>
+                            <span class="tag">👤 Tutor: <span id="atencion-tutor">--</span></span>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <button class="btn-close" onclick="cerrarModalAtencion()" style="font-size: 2rem;">&times;</button>
-        </header>
+                <button class="btn-close" onclick="cerrarModalAtencion()" style="font-size: 2rem;">&times;</button>
+            </header>
 
-        <div class="atencion-layout-grid">
-            <aside class="atencion-sidebar-clinica">
-                <div class="atencion-card">
+            <div class="atencion-banda-horizontal">
+                <div class="atencion-card banda-card">
                     <h4>Progreso del Ciclo</h4>
                     <div class="atencion-stats">
                         <strong id="atencion-sesiones-count">0</strong> sesiones realizadas
@@ -124,40 +124,40 @@
                     </div>
                 </div>
 
-                <div class="atencion-card">
+                <div class="atencion-card banda-card">
                     <h4>Indicadores de Logro</h4>
-                    <ul id="atencion-lista-indicadores" class="atencion-lista-check">
-                        </ul>
+                    <ul id="atencion-lista-indicadores" class="atencion-lista-check"></ul>
                 </div>
-                
-                <div id="alerta-primer-ingreso" class="alerta-ingreso" style="display:none;">
+
+                <div id="alerta-primer-ingreso" class="alerta-ingreso banda-card" style="display:none;">
                     ⭐ <strong>Primer Ingreso:</strong> Requiere anamnesis completa y validación de datos de contacto.
                 </div>
-            </aside>
+            </div>
 
-            <main class="atencion-main-registro">
-                <div class="form-group-flex">
-                    <label>Evolución de la Sesión</label>
-                    <textarea id="atencion-actividades" class="textarea-atencion-pro" 
-                        placeholder="Escribe aquí las observaciones clínicas, hitos alcanzados y plan para la próxima sesión..."></textarea>
-                </div>
-
-                <footer class="atencion-footer-acciones">
-                    <div class="mini-seccion-cobro">
-                        <span class="label-cobro">Cobro: </span>
-                        <input type="number" id="atencion-monto" class="input-minimal" placeholder="$">
-                        <select id="atencion-pago-estado" class="select-minimal">
-                            <option value="pendiente">Pendiente</option>
-                            <option value="pagado">Pagado</option>
-                        </select>
-                        <span id="aviso-tarifa" class="badge-tarifa" style="display:none;">Tarifa Pactada</span>
+            <div class="atencion-layout-grid">
+                <main class="atencion-main-registro">
+                    <div class="form-group-flex" style="display:flex; flex-direction:column; flex-grow:1;">
+                        <label>Evolución de la Sesión</label>
+                        <textarea id="atencion-actividades" class="textarea-atencion-pro" 
+                            placeholder="Escribe aquí las observaciones clínicas, hitos alcanzados y plan para la próxima sesión..."></textarea>
                     </div>
-                    <button type="button" class="btn-primary-pro" onclick="finalizarAtencion()">💾 Guardar y Finalizar Sesión</button>
-                </footer>
-            </main>
+
+                    <footer class="atencion-footer-acciones">
+                        <div class="mini-seccion-cobro">
+                            <span class="label-cobro">Cobro: </span>
+                            <input type="number" id="atencion-monto" class="input-minimal" placeholder="$">
+                            <select id="atencion-pago-estado" class="select-minimal">
+                                <option value="pendiente">Pendiente</option>
+                                <option value="pagado">Pagado</option>
+                            </select>
+                            <span id="aviso-tarifa" class="badge-tarifa" style="display:none;">Tarifa Pactada</span>
+                        </div>
+                        <button type="button" class="btn-primary-pro" onclick="finalizarAtencion()">💾 Guardar y Finalizar Sesión</button>
+                    </footer>
+                </main>
+            </div>
+
         </div>
-    </div>
-    </div>
 
     <script src="/static/js/main.js"></script>
 </body>

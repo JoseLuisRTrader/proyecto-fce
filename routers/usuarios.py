@@ -43,19 +43,35 @@ def listar_usuarios(db: Session = Depends(get_db)):
 def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
     user = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
     
-    # Cálculo de edad simple
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Cálculo de edad
     hoy = date.today()
-    edad = hoy.year - user.fecha_nacimiento.year - ((hoy.month, hoy.day) < (user.fecha_nacimiento.month, user.fecha_nacimiento.day))
+    edad = hoy.year - user.fecha_nacimiento.year - (
+        (hoy.month, hoy.day) < (user.fecha_nacimiento.month, user.fecha_nacimiento.day)
+    )
     
-    # Conteo de sesiones y diagnóstico
-    total_sesiones = db.query(models.Sesion).join(models.Ciclo).filter(models.Ciclo.usuario_id == usuario_id).count()
-    diag = db.query(models.Diagnostico).filter(models.Diagnostico.usuario_id == usuario_id).first()
+    # Conteo de sesiones
+    total_sesiones = db.query(models.Sesion).join(models.Ciclo).filter(
+        models.Ciclo.usuario_id == usuario_id
+    ).count()
     
+    # Diagnóstico
+    diag = db.query(models.Diagnostico).filter(
+        models.Diagnostico.usuario_id == usuario_id
+    ).first()
+
+    # Nombre tutor
+    nombre_tutor = user.nombre_tutor or "No asignado"
+
     return {
         "nombre": user.nombre,
         "edad": edad,
-        "ultimo_diagnostico": diag.descripcion if diag else None,
+        "nombre_tutor": nombre_tutor,
+        "ultimo_diagnostico": diag.descripcion if diag else "Sin diagnóstico registrado",
         "total_sesiones": total_sesiones,
-        "tarifa_pactada": user.tarifa_pactada,
-        "indicadores": [] # Aquí puedes luego sumar la lógica de IndicadorLogro
+        "tarifa_pactada": None,
+        "indicadores": [],
+        "foto_url": None
     }
