@@ -1,58 +1,64 @@
-import sqlite3
-import os
+from database import SessionLocal
+from models import Usuario, BloqueHorario, Reserva, Profesional
 from datetime import date, timedelta
 
-DB_PATH = "/Users/joseluis/Documents/PROGRAMACION/proyecto_fce/fce.db"
+db = SessionLocal()
 
-def seed_masivo():
-    if not os.path.exists(DB_PATH):
-        print(f"❌ No se encuentra el archivo en: {DB_PATH}")
-        return
+# Usar el profesional existente (id=1)
+profesional_id = 1
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+# Usuarios de prueba
+usuarios_data = [
+    {"nombre": "María González", "rut": "12345678-1", "fecha_nacimiento": date(2015, 3, 10), "nombre_tutor": "Ana González"},
+    {"nombre": "Pedro Ramírez", "rut": "12345678-2", "fecha_nacimiento": date(2016, 7, 22), "nombre_tutor": "Luis Ramírez"},
+    {"nombre": "Sofía Martínez", "rut": "12345678-3", "fecha_nacimiento": date(2014, 1, 5), "nombre_tutor": "Carmen Martínez"},
+    {"nombre": "Diego López", "rut": "12345678-4", "fecha_nacimiento": date(2017, 9, 18), "nombre_tutor": "Jorge López"},
+    {"nombre": "Valentina Muñoz", "rut": "12345678-5", "fecha_nacimiento": date(2015, 12, 30), "nombre_tutor": "Rosa Muñoz"},
+    {"nombre": "Matías Pérez", "rut": "12345678-6", "fecha_nacimiento": date(2016, 4, 14), "nombre_tutor": "Patricia Pérez"},
+    {"nombre": "Isadora Rojas", "rut": "12345678-7", "fecha_nacimiento": date(2013, 8, 25), "nombre_tutor": "Manuel Rojas"},
+    {"nombre": "Benjamín Silva", "rut": "12345678-8", "fecha_nacimiento": date(2018, 2, 7), "nombre_tutor": "Sandra Silva"},
+    {"nombre": "Antonia Vargas", "rut": "12345678-9", "fecha_nacimiento": date(2014, 6, 19), "nombre_tutor": "Felipe Vargas"},
+    {"nombre": "Emilio Castro", "rut": "12345678-0", "fecha_nacimiento": date(2017, 11, 3), "nombre_tutor": "Mónica Castro"},
+]
 
-    # Definimos la carga de trabajo solicitada
-    planificacion = [
-        {"dias_offset": 0, "cantidad": 3, "etiqueta": "Hoy"},
-        {"dias_offset": 1, "cantidad": 4, "etiqueta": "Mañana"},
-        {"dias_offset": 2, "cantidad": 5, "etiqueta": "Pasado Mañana"}
-    ]
+# Crear usuarios
+usuarios = []
+for u in usuarios_data:
+    usuario = Usuario(**u)
+    db.add(usuario)
+    db.flush()
+    usuarios.append(usuario)
 
-    try:
-        for item in planificacion:
-            fecha_objetivo = (date.today() + timedelta(days=item['dias_offset'])).isoformat()
-            print(f"--- Generando {item['cantidad']} citas para {item['etiqueta']} ({fecha_objetivo}) ---")
+# Horarios de prueba
+horarios = ["09:00", "10:00", "11:00", "12:00", "15:00"]
 
-            for i in range(item['cantidad']):
-                # 1. Crear el bloque horario (ajustando horas para que no choquen)
-                hora_h = 9 + i
-                h_inicio = f"{hora_h:02d}:00"
-                h_fin = f"{hora_h:02d}:45"
-                
-                cursor.execute("""
-                    INSERT INTO bloques_horario (profesional_id, fecha, hora_inicio, hora_fin)
-                    VALUES (?, ?, ?, ?)
-                """, (1, fecha_objetivo, h_inicio, h_fin))
-                
-                bloque_id = cursor.lastrowid
+# Crear bloques y reservas para los próximos 10 días
+hoy = date.today()
+usuario_idx = 0
 
-                # 2. Crear la reserva vinculada
-                # Usamos usuario_id aleatorios entre 1 y 5 (asegúrate de tener usuarios creados)
-                usuario_id = (i % 5) + 1 
-                cursor.execute("""
-                    INSERT INTO reservas (usuario_id, bloque_horario_id, estado)
-                    VALUES (?, ?, ?)
-                """, (usuario_id, bloque_id, "confirmada"))
+for i in range(1, 11):
+    dia = hoy + timedelta(days=i)
+    
+    # 2-3 citas por día
+    for j in range(min(3, len(usuarios) - usuario_idx)):
+        bloque = BloqueHorario(
+            profesional_id=profesional_id,
+            fecha=dia,
+            hora_inicio=horarios[j],
+            hora_fin=horarios[j].replace(str(int(horarios[j][:2])), str(int(horarios[j][:2]) + 1)),
+            disponible=False
+        )
+        db.add(bloque)
+        db.flush()
 
-        conn.commit()
-        print("\n✅ Base de datos poblada exitosamente para los próximos 3 días.")
+        reserva = Reserva(
+            usuario_id=usuarios[usuario_idx % len(usuarios)].id,
+            bloque_horario_id=bloque.id,
+            estado="confirmada"
+        )
+        db.add(reserva)
+        usuario_idx += 1
 
-    except Exception as e:
-        print(f"❌ Error durante el seed: {e}")
-        conn.rollback()
-    finally:
-        conn.close()
-
-if __name__ == "__main__":
-    seed_masivo()
+db.commit()
+db.close()
+print("✅ Datos de prueba creados correctamente para los próximos 10 días")

@@ -225,14 +225,14 @@ input:focus {
     border: 1px solid #e2e8f0;
 }
 
-.paciente-info {
+.usuario-info {
     display: flex;
     flex-direction: column;
     justify-content: center;
 }
 
-.paciente-nombre { font-weight: 600; color: #1f2937; }
-.paciente-rut { font-size: 0.75rem; color: #6b7280; }
+.usuario-nombre { font-weight: 600; color: #1f2937; }
+.usuario-rut { font-size: 0.75rem; color: #6b7280; }
 
 .semaforo-dot {
     height: 12px;
@@ -303,7 +303,7 @@ input:focus {
     margin: 0;
 }
 
-/* 2. Header: Perfil del paciente y cierre */
+/* 2. Header: Perfil del usuario y cierre */
 .atencion-header-pro {
     background: #f8fafc;
     padding: 20px 40px;
@@ -529,4 +529,218 @@ input:focus {
 .btn-close:hover {
     background: #fee2e2;
     color: #dc2626;
+}
+
+/* PRÓXIMOS DÍAS */
+.dia-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+.dia-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.dia-header:hover {
+    background: #f8fafc;
+}
+
+.dia-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.dia-nombre {
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 0.95rem;
+}
+
+.dia-badge {
+    background: #dbeafe;
+    color: #1d4ed8;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.dia-flecha {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    transition: transform 0.2s;
+}
+
+.dia-detalle {
+    border-top: 1px solid #e2e8f0;
+    padding: 15px 20px;
+    background: #f8fafc;
+}
+
+/* BOTONES ACCIÓN RÁPIDA EN MODAL */
+.atencion-acciones-rapidas {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    margin-left: 20px;
+}
+
+.btn-accion-rapida {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #2563eb;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.btn-accion-rapida:hover {
+    background: #dbeafe;
+    border-color: #2563eb;
+}
+
+/*dentro del registro el boton de editar*/
+/* TABS */
+.tabs-container {
+    display: flex;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 20px;
+    gap: 5px;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #64748b;
+    font-weight: 600;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: #2563eb;
+}
+
+.tab-btn.active {
+    color: #2563eb;
+    border-bottom: 2px solid #2563eb;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+
+/*FORMATO PARA EL IENTERIOR DEL BOTON DE EDITAR USUARIO*/
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border 0.2s;
+    box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    border-color: #2563eb;
+}
+
+/*Botones de eliminar diagnostivos y medicamentos*/
+
+.btn-eliminar {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.btn-eliminar:hover {
+    background: #fee2e2;
+}
+
+.item-lista {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid #e2e8f0;
+}
+.btn-secondary {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-secondary:hover {
+    background: #e2e8f0;
+}
+
+/*Funcion ver más*/
+.ver-mas-diag {
+    color: #2563eb;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-weight: 600;
+    margin-left: 6px;
+}
+
+.ver-mas-diag:hover {
+    text-decoration: underline;
+}
+
+.diagnosticos-wrapper {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.lista-diag-extra {
+    display: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
 }

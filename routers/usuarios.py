@@ -12,22 +12,21 @@ router = APIRouter(
 )
 
 @router.post("/", response_model=schemas.UsuarioRespuesta)
-def crear_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
-    # Verificamos si el RUT ya existe
-    from datetime import date
+def crear_usuario(usuario: schemas.UsuarioCrear, db: Session = Depends(get_db)):
     db_usuario = db.query(models.Usuario).filter(models.Usuario.rut == usuario.rut).first()
     if db_usuario:
         raise HTTPException(status_code=400, detail="El RUT ya está registrado")
     
-    # NOTA: Tu modelo 'Usuario' pide 'fecha_nacimiento' como obligatorio.
-    # Por ahora, pondremos una fecha por defecto para que no te de error 500,
-    # hasta que mañana agregues el campo al modal.
-
     nuevo_usuario = models.Usuario(
         rut=usuario.rut,
         nombre=usuario.nombre,
         email=usuario.email,
-        fecha_nacimiento=date(2000, 1, 1) # Valor temporal para cumplir con el modelo
+        fecha_nacimiento=usuario.fecha_nacimiento,
+        telefono_1=usuario.telefono_1,
+        nombre_tutor=usuario.nombre_tutor,
+        telefono_2=usuario.telefono_2,
+        establecimiento_educacional=usuario.establecimiento_educacional,
+        tarifa_pactada=usuario.tarifa_pactada
     )
     
     db.add(nuevo_usuario)
@@ -38,6 +37,13 @@ def crear_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db))
 @router.get("/", response_model=list[schemas.UsuarioRespuesta]) # <-- Cambiado de "/usuarios" a "/"
 def listar_usuarios(db: Session = Depends(get_db)):
     return db.query(models.Usuario).all()
+
+@router.get("/{usuario_id}", response_model=schemas.UsuarioRespuesta)
+def obtener_usuario(usuario_id: int, db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return usuario
 
 @router.get("/detalle-atencion/{usuario_id}")
 def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
@@ -57,10 +63,22 @@ def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
         models.Ciclo.usuario_id == usuario_id
     ).count()
     
-    # Diagnóstico
-    diag = db.query(models.Diagnostico).filter(
-        models.Diagnostico.usuario_id == usuario_id
-    ).first()
+    # Diagnósticos
+    diagnosticos = db.query(models.Diagnostico).filter(
+    models.Diagnostico.usuario_id == usuario_id
+    ).all()
+
+    return {
+        "nombre": user.nombre,
+        "edad": edad,
+        "nombre_tutor": user.nombre_tutor,
+        "ultimo_diagnostico": diagnosticos[0].descripcion if diagnosticos else "Sin diagnóstico registrado",
+        "diagnosticos": [{"id": d.id, "descripcion": d.descripcion, "tipo": d.tipo} for d in diagnosticos],
+        "total_sesiones": total_sesiones,
+        "tarifa_pactada": None,
+        "indicadores": [],
+        "foto_url": None
+    }
 
     # Nombre tutor
     nombre_tutor = user.nombre_tutor or "No asignado"
@@ -75,3 +93,15 @@ def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
         "indicadores": [],
         "foto_url": None
     }
+
+@router.put("/{usuario_id}", response_model=schemas.UsuarioRespuesta)
+def actualizar_usuario(usuario_id: int, datos: schemas.UsuarioActualizar, db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    for campo, valor in datos.dict(exclude_unset=True).items():
+        setattr(usuario, campo, valor)
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+

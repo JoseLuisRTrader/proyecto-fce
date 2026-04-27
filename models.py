@@ -25,9 +25,9 @@ class Usuario(Base):
     tarifa_pactada = Column(Integer, nullable=True) 
 
     # Relaciones para facilitar reportes
-    reservas = relationship("Reserva", back_populates="paciente")
-    ingresos = relationship("Ingreso", back_populates="paciente")
-    ciclos = relationship("Ciclo", back_populates="paciente")
+    reservas = relationship("Reserva", back_populates="usuario")
+    ingresos = relationship("Ingreso", back_populates="usuario")
+    ciclos = relationship("Ciclo", back_populates="usuario")
 
 class BloqueHorario(Base):
     __tablename__ = "bloques_horario"
@@ -47,7 +47,7 @@ class Reserva(Base):
     bloque_horario_id = Column(Integer, ForeignKey("bloques_horario.id"))
     estado = Column(String, default="confirmada") # 'confirmada', 'asistio', 'nsp', 'cancelada'
 
-    paciente = relationship("Usuario", back_populates="reservas")
+    usuario = relationship("Usuario", back_populates="reservas")
     bloque = relationship("BloqueHorario", back_populates="reserva")
     sesion = relationship("Sesion", back_populates="reserva", uselist=False)
 
@@ -60,7 +60,7 @@ class Ciclo(Base):
     numero_sesiones = Column(Integer, default=0)
     estado = Column(String, default="activo")
 
-    paciente = relationship("Usuario", back_populates="ciclos")
+    usuario = relationship("Usuario", back_populates="ciclos")
     objetivos = relationship("Objetivo", back_populates="ciclo")
     sesiones = relationship("Sesion", back_populates="ciclo")
 
@@ -107,9 +107,11 @@ class Ingreso(Base):
     fecha_emision = Column(Date, default=date.today)
     estado = Column(String, default="pendiente") # "pendiente", "pagado"
     metodo_pago = Column(String, nullable=True) 
-    observaciones = Column(String, nullable=True) 
+    observaciones = Column(String, nullable=True)
+    sesion_id = Column(Integer, ForeignKey("sesiones.id"), nullable=True)
+    informe_id = Column(Integer, ForeignKey("informes.id"), nullable=True) 
 
-    paciente = relationship("Usuario", back_populates="ingresos")
+    usuario = relationship("Usuario", back_populates="ingresos")
 
 class Gasto(Base):
     """Módulo de Finanzas: Salidas de dinero"""

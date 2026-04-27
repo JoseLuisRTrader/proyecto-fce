@@ -3,15 +3,15 @@ from datetime import date
 from typing import Optional
 
 class UsuarioCrear(BaseModel):
-    nombre: str
     rut: str
+    nombre: str
     fecha_nacimiento: date
     telefono_1: Optional[str] = None
     telefono_2: Optional[str] = None
     email: Optional[str] = None
     nombre_tutor: Optional[str] = None
     establecimiento_educacional: Optional[str] = None
-
+    tarifa_pactada: Optional[int] = None
 class UsuarioRespuesta(BaseModel):
     id: int
     nombre: str
@@ -159,8 +159,8 @@ class EvaluacionIndicadorRespuesta(BaseModel):
     cumplido: bool
     observacion: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+class Config:
+    from_attributes = True
 
 class InformeCrear(BaseModel):
     ciclo_id: int
@@ -181,3 +181,48 @@ class InformeRespuesta(BaseModel):
 class LoginSchema(BaseModel):
     email: str
     password: str
+
+class UsuarioActualizar(BaseModel):
+    rut: Optional[str] =None
+    nombre: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    telefono_1: Optional[str] = None
+    telefono_2: Optional[str] = None
+    email: Optional[str] = None
+    nombre_tutor: Optional[str] = None
+    establecimiento_educacional: Optional[str] = None
+    tarifa_pactada: Optional[int] = None
+
+class DiagnosticoCrear(BaseModel):
+    usuario_id: int
+    descripcion: str
+    tipo: str
+    fecha: Optional[date] = None
+
+class DiagnosticoRespuesta(BaseModel):
+    id: int
+    usuario_id: int
+    descripcion: str
+    tipo: str
+    fecha: Optional[date] = None
+
+    class Config:
+        from_attributes = True
+
+class MedicamentoCrear(BaseModel):
+    usuario_id: int
+    nombre: str
+    dosis: Optional[str] = None
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
+
+class MedicamentoRespuesta(BaseModel):
+    id: int
+    usuario_id: int
+    nombre: str
+    dosis: Optional[str] = None
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
+
+    class Config:
+        from_attributes = True

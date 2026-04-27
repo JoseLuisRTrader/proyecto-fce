@@ -8,14 +8,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body class="dashboard-layout">
-
+    <!-- Barra menú derecha📝 -->
     <nav class="sidebar">
         <div class="sidebar-header">
             <h2>FCE Project</h2>
         </div>
         <ul class="sidebar-menu">
             <li><a href="/dashboard" class="active">📊 Resumen</a></li>
-            <li><a href="#" onclick="abrirModalPaciente()">👥 Nuevo Usuario</a></li>
+            <li><a href="#" onclick="abrirModalUsuario()">👥 Nuevo Usuario</a></li>
             <li><a href="#" onclick="alert('Próximamente...')">📅 Agenda</a></li>
             <li><a href="#" onclick="alert('Cargando Dashboard Financiero...')">💰 Finanzas</a></li>
         </ul>
@@ -25,9 +25,8 @@
             <button onclick="cerrarSesion()" class="btn-logout">Cerrar Sesión</button>
         </div>
     </nav>
-
-    <div class="main-wrapper">
-        
+    <!-- Cabecera fecha y profesional -->
+    <div class="main-wrapper">   
         <header class="top-bar">
             <div class="top-bar-left">
                 <span id="fecha-completa" class="full-date"></span>
@@ -52,65 +51,80 @@
                     <p id="ciclos-activos">0</p>
                 </div>
                 <div class="card">
-                    <h3>Total Pacientes</h3>
-                    <p id="total-pacientes">0</p>
+                    <h3>Total Usuarios</h3>
+                    <p id="total-usuarios">0</p>
                 </div>
             </section>
 
             <section class="table-section" style="margin-top: 40px;">
-                <h2 style="margin-bottom: 20px; color: #374151;">Próximas Citas con Pacientes</h2>
+                <h2 style="margin-bottom: 20px; color: #374151;">Sesiones de Hoy</h2>
                 <div id="lista-citas" class="citas-container">
-                    <p>Cargando pacientes...</p>
+                    <p>Cargando usuarios...</p>
                 </div>
+            </section>
+            <section class="table-section" style="margin-top: 40px;">
+                <h2 style="margin-bottom: 20px; color: #374151;">Próximos Días</h2>
+                <div id="lista-proximos-dias"></div>
             </section>
 
         </main>
     </div>
-
-    <div id="modal-paciente" class="modal-overlay">
+    <!-- vista nuevo usuario-->
+    <div id="modal-usuario" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Registrar Nuevo Paciente</h2>
-                <button class="btn-close" onclick="cerrarModalPaciente()">&times;</button>
+                <h2>Registrar Nuevo Usuario</h2>
+                <button class="btn-close" onclick="cerrarModalUsuario()">&times;</button>
             </div>
-            <form id="form-paciente">
+            <form id="form-usuario">
                 <div class="form-group">
-                    <label for="paciente-rut">RUT</label>
-                    <input type="text" id="paciente-rut" placeholder="Ej: 12345678-9" required>
+                    <label for="usuario-rut">RUT</label>
+                    <input type="text" id="usuario-rut" placeholder="Ej: 12345678-9" required>
                 </div>
                 <div class="form-group">
-                    <label for="paciente-nombre">Nombre Completo</label>
-                    <input type="text" id="paciente-nombre" placeholder="Ej: Juan Pérez" required>
+                    <label for="usuario-nombre">Nombre Completo</label>
+                    <input type="text" id="usuario-nombre" placeholder="Ej: Juan Pérez" required>
                 </div>
                 <div class="form-group">
-                    <label for="paciente-email">Correo Electrónico</label>
-                    <input type="email" id="paciente-email" placeholder="correo@ejemplo.com" required>
+                    <label for="usuario-email">Correo Electrónico</label>
+                    <input type="email" id="usuario-email" placeholder="correo@ejemplo.com" required>
                 </div>
                 <div class="form-group">
-                    <label for="paciente-password">Contraseña Temporal</label>
-                    <input type="password" id="paciente-password" required>
+                    <label for="usuario-password">Contraseña Temporal</label>
+                    <input type="password" id="usuario-password" required>
                 </div>
                 <p id="modal-mensaje-error" class="mensaje-error"></p>
-                <button type="button" class="btn-primary" onclick="guardarPaciente()">💾 Guardar Usuario</button>
+                <button type="button" class="btn-primary" onclick="guardarUsuario()">💾 Guardar Usuario</button>
             </form>
         </div>
     </div>
+    <!-- vista del boton "Registrar"-->
     <div id="modal-atencion" class="modal-overlay">
         <div class="modal-content modal-fullscreen">
 
             <header class="atencion-header-pro">
                 <div class="atencion-perfil-wrapper">
-                    <img id="atencion-foto" src="" class="avatar-grande" alt="Foto Paciente">
+                    <img id="atencion-foto" src="" class="avatar-grande" alt="Foto usuario">
                     <div class="atencion-datos-principales">
-                        <h2 id="atencion-nombre-paciente">Nombre del Paciente</h2>
+                        <h2 id="atencion-nombre-usuario">Nombre del Usuario</h2>
                         <div class="tags-atencion">
                             <span class="tag">🎂 <span id="atencion-edad">--</span> años</span>
-                            <span class="tag">📋 <span id="atencion-diagnostico">--</span></span>
                             <span class="tag">👤 Tutor: <span id="atencion-tutor">--</span></span>
                         </div>
+                        <div id="atencion-diagnosticos-wrapper" class="diagnosticos-wrapper"></div>
                     </div>
                 </div>
+                <div class="atencion-acciones-rapidas">
+                    <button class="btn-accion-rapida" onclick="abrirFichaClinica()">
+                        📁 Ficha Clínica
+                    </button>
+                    <button class="btn-accion-rapida" onclick="abrirEditarUsuario()">                            
+                        ✏️ Editar Usuario
+                    </button>
+
+                
                 <button class="btn-close" onclick="cerrarModalAtencion()" style="font-size: 2rem;">&times;</button>
+            </div>
             </header>
 
             <div class="atencion-banda-horizontal">
@@ -156,9 +170,117 @@
                     </footer>
                 </main>
             </div>
-
         </div>
+        </div>
+    <!-- vista interna del boton "Editar Usuario" dentro de boton "Registrar"-->
+    <div id="modal-editar-usuario" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px; width: 95%;">
+            <div class="modal-header">
+                <h2>✏️ Editar Usuario</h2>
+                <button class="btn-close" onclick="cerrarEditarUsuario()">&times;</button>
+            </div>
 
+            <div class="tabs-container">
+                <button class="tab-btn active" onclick="cambiarTab('datos')">👤 Datos Personales</button>
+                <button class="tab-btn" onclick="cambiarTab('diagnosticos')">📋 Diagnósticos</button>
+                <button class="tab-btn" onclick="cambiarTab('medicamentos')">💊 Medicamentos</button>
+            </div>
+
+            <div id="tab-datos" class="tab-content active">
+                <div class="form-group">
+                    <label>Nombre Completo</label>
+                    <input type="text" id="edit-nombre">
+                </div>
+                <div class="form-group">
+                    <label>RUT</label>
+                    <input type="text" id="edit-rut">
+                </div>
+                <div class="form-group">
+                    <label>Fecha de Nacimiento</label>
+                    <input type="date" id="edit-fecha-nacimiento">
+                </div>
+                <div class="form-group">
+                    <label>Teléfono 1</label>
+                    <input type="text" id="edit-telefono1">
+                </div>
+                <div class="form-group">
+                    <label>Teléfono 2</label>
+                    <input type="text" id="edit-telefono2">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="edit-email">
+                </div>
+                <div class="form-group">
+                    <label>Nombre Tutor</label>
+                    <input type="text" id="edit-tutor">
+                </div>
+                <div class="form-group">
+                    <label>Establecimiento Educacional</label>
+                    <input type="text" id="edit-establecimiento">
+                </div>
+                <div class="form-group">
+                    <label>Tarifa Pactada</label>
+                    <input type="number" id="edit-tarifa" placeholder="Ej: 35000">
+                </div>
+                <button class="btn-primary" style="margin-top: 20px;" onclick="guardarDatosUsuario()">💾 Guardar Cambios</button>
+            </div>
+
+            <div id="tab-diagnosticos" class="tab-content">
+                <div id="lista-diagnosticos"></div>
+                <hr style="margin: 15px 0;">
+                
+                <input type="hidden" id="diag-edit-id" value="">
+                
+                <h4 id="diag-form-titulo">Agregar Diagnóstico</h4>
+                <div class="form-group">
+                    <label>Descripción *</label>
+                    <input type="text" id="diag-descripcion" placeholder="Ej: Trastorno del desarrollo psicomotor">
+                </div>
+                <div class="form-group">
+                    <label>Tipo *</label>
+                    <input type="text" id="diag-tipo" placeholder="Ej: CIE-10, DSM-5">
+                </div>
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="diag-fecha">
+                </div>
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn-primary" id="diag-btn-guardar" onclick="guardarDiagnostico()">➕ Agregar</button>
+                    <button class="btn-secondary" id="diag-btn-cancelar" onclick="cancelarEditarDiagnostico()" style="display:none;">❌ Cancelar</button>
+                </div>
+            </div>
+
+            <div id="tab-medicamentos" class="tab-content">
+                <div id="lista-medicamentos"></div>
+                <hr style="margin: 15px 0;">
+
+                <input type="hidden" id="med-edit-id" value="">
+
+                <h4 id="med-form-titulo">Agregar Medicamento</h4>
+                <div class="form-group">
+                    <label>Nombre *</label>
+                    <input type="text" id="med-nombre" placeholder="Ej: Ritalin">
+                </div>
+                <div class="form-group">
+                    <label>Dosis</label>
+                    <input type="text" id="med-dosis" placeholder="Ej: 10mg">
+                </div>
+                <div class="form-group">
+                    <label>Fecha Inicio</label>
+                    <input type="date" id="med-fecha-inicio">
+                </div>
+                <div class="form-group">
+                    <label>Fecha Fin</label>
+                    <input type="date" id="med-fecha-fin">
+                </div>
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn-primary" id="med-btn-guardar" onclick="guardarMedicamento()">➕ Agregar</button>
+                    <button class="btn-secondary" id="med-btn-cancelar" onclick="cancelarEditarMedicamento()" style="display:none;">❌ Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <script src="/static/js/main.js"></script>
 </body>
 </html>

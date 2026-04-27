@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from routers import usuarios, profesionales, bloques_horario, reservas, ciclos, sesiones, objetivos, indicadores, informes, dashboard, finanzas
+from routers import usuarios, profesionales, bloques_horario, reservas, ciclos, sesiones, objetivos, indicadores, informes, dashboard, finanzas, diagnosticos, medicamentos
 
 app = FastAPI()
 
@@ -18,6 +18,8 @@ app.include_router(indicadores.router)
 app.include_router(informes.router)
 app.include_router(dashboard.router)
 app.include_router(finanzas.router)
+app.include_router(diagnosticos.router)
+app.include_router(medicamentos.router)
 
 @app.get("/")
 def inicio():
