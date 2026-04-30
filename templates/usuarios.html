@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCE - Usuarios</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-layout">
+
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>FCE Project</h2>
+        </div>
+        <ul class="sidebar-menu">
+            <li><a href="/dashboard">📊 Resumen</a></li>
+            <li><a href="/usuarios" class="active">👥 Usuarios</a></li>
+            <li><a href="#" onclick="alert('Próximamente...')">📅 Agenda</a></li>
+            <li><a href="#" onclick="alert('Próximamente...')">💰 Finanzas</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <a href="#" class="btn-config">⚙️ Configuración</a>
+            <button onclick="cerrarSesion()" class="btn-logout">Cerrar Sesión</button>
+        </div>
+    </nav>
+
+    <div class="main-wrapper">
+
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <span id="fecha-completa" class="full-date"></span>
+            </div>
+            <div class="top-bar-right">
+                <div class="profile-display">
+                    <span id="nombre-profesional-top">Cargando...</span>
+                    <img src="" class="avatar-small" id="user-photo-top" alt="Perfil">
+                </div>
+            </div>
+        </header>
+
+        <main class="content-area">
+
+            <div class="page-header">
+                <div class="page-header-top">
+                    <h2>👥 Usuarios</h2>
+                </div>
+                <div class="page-header-stats" id="header-stats">
+                    <span>Total: <b id="stat-total">0</b></span>
+                    <span style="color:#22c55e;">🟢 <b id="stat-tto">0</b> en TTO</span>
+                    <span style="color:#3b82f6;">🔵 <b id="stat-alta">0</b> alta</span>
+                    <span style="color:#facc15;">🟡 <b id="stat-pausa">0</b> pausa</span>
+                </div>
+            </div>
+
+            <!-- FILTROS -->
+            <div class="filtros-wrapper">  
+                <span style="color:#94a3b8; font-size:0.9rem;">🔍</span>
+                <input type="text" id="filtro-buscar" class="input-buscar"
+                    placeholder="Buscar por nombre o RUT..."
+                    oninput="filtrarUsuarios()">
+                <select class="filtro-select-mini" id="filtro-estado" onchange="filtrarUsuarios()">
+                    <option value="">Estado</option>
+                    <option value="en_tto">🟢 En TTO</option>
+                    <option value="alta">🔵 Alta</option>
+                    <option value="pausa">🟡 Pausa</option>
+                    <option value="lista_espera">🟠 Lista espera</option>
+                    <option value="derivado">⚪ Derivado</option>
+                </select>
+                <select class="filtro-select-mini" id="filtro-edad" onchange="filtrarUsuarios()">
+                    <option value="">Edad</option>
+                    <option value="asc">Mayor a menor</option>
+                    <option value="desc">Menor a mayor</option>
+                </select>
+                <select class="filtro-select-mini" id="filtro-ciclos" onchange="filtrarUsuarios()">
+                    <option value="">Ciclos</option>
+                    <option value="desc">Mayor a menor</option>
+                    <option value="asc">Menor a mayor</option>
+                </select>
+            </div>
+
+            <!-- TOGGLE VISTA -->
+            <div class="vista-toggle">
+                <button class="btn-vista activo" id="btn-vista-tabla" onclick="cambiarVista('tabla')">☰ Tabla</button>
+                <button class="btn-vista" id="btn-vista-cards" onclick="cambiarVista('cards')">⊞ Cards</button>
+                <button class="btn-vista" id="btn-vista-compacta" onclick="cambiarVista('compacta')">≡ Compacta</button>
+                <span class="total-usuarios" id="total-label">0 usuarios</span>
+            </div>
+
+            <!-- VISTAS -->
+            <div id="vista-tabla" class="tabla-container"></div>
+            <div id="vista-cards" class="cards-grid" style="display:none;"></div>
+            <div id="vista-compacta" class="compacta-lista" style="display:none;"></div>
+
+        </main>
+
+        <!-- BOTÓN FLOTANTE -->
+        <button class="btn-flotante" onclick="abrirModalUsuario()">➕ Nuevo Usuario</button>
+        </div>
+
+        <!-- MODAL NUEVO USUARIO (trasladado desde dashboard) -->
+        <div id="modal-usuario" class="modal-overlay">
+            <div class="modal-content" style="max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header">
+                    <h2>👤 Registrar Nuevo Usuario</h2>
+                    <button class="btn-close" onclick="cerrarModalUsuario()">&times;</button>
+                </div>
+                <form id="form-usuario">
+                    <div class="form-seccion">
+                        <h4 class="form-seccion-titulo">📋 Datos Básicos</h4>
+                        <div class="form-grid-2">
+                            <div class="form-group" style="grid-column: 1/-1;">
+                                <label>Foto del Usuario</label>
+                                <div class="foto-upload-container" onclick="document.getElementById('input-foto').click()">
+                                    <img id="preview-foto" src="https://ui-avatars.com/api/?name=Nuevo+Usuario&background=e2e8f0&color=94a3b8&size=128" 
+                                        class="preview-foto-img">
+                                    <div class="foto-upload-overlay">
+                                        <span>📷 Cambiar foto</span>
+                                    </div>
+                                </div>
+                                <input type="file" id="input-foto" accept="image/*" capture="environment" 
+                                    style="display:none;" onchange="previsualizarFoto(event)">
+                                <p style="font-size:0.75rem; color:#94a3b8; margin-top:6px; text-align:center;">
+                                    Haz clic para subir o tomar foto
+                                </p>
+                            </div>
+                            <div class="form-group">
+                                <label>RUT *</label>
+                                <input type="text" id="usuario-rut" placeholder="Ej: 12345678-9">
+                            </div>
+                            <div class="form-group">
+                                <label>Nombre Completo *</label>
+                                <input type="text" id="usuario-nombre" placeholder="Ej: Juan Pérez">
+                            </div>
+                            <div class="form-group">
+                                <label>Fecha de Nacimiento *</label>
+                                <input type="date" id="usuario-fecha-nacimiento">
+                            </div>
+                            <div class="form-group">
+                                <label>Teléfono 1</label>
+                                <input type="text" id="usuario-telefono1" placeholder="Ej: +56912345678">
+                            </div>
+                            <div class="form-group">
+                                <label>Nombre Tutor</label>
+                                <input type="text" id="usuario-tutor" placeholder="Ej: María González">
+                            </div>
+                            <div class="form-group">
+                                <label>Establecimiento Educacional</label>
+                                <input type="text" id="usuario-establecimiento" placeholder="Ej: Escuela Villa Alegre">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-seccion">
+                        <h4 class="form-seccion-titulo collapsible" onclick="toggleSeccion('seccion-adicional', this)">
+                            ➕ Datos Adicionales <span class="seccion-badge">Opcional</span>
+                        </h4>
+                        <div id="seccion-adicional" style="display:none;">
+                            <div class="form-grid-2">
+                                <div class="form-group">
+                                    <label>Teléfono 2</label>
+                                    <input type="text" id="usuario-telefono2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" id="usuario-email">
+                                </div>
+                                <div class="form-group">
+                                    <label>Tarifa Pactada</label>
+                                    <input type="number" id="usuario-tarifa">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-seccion">
+                        <h4 class="form-seccion-titulo collapsible" onclick="toggleSeccion('seccion-diagnosticos-nuevo', this)">
+                            📋 Diagnósticos <span class="seccion-badge">Opcional</span>
+                        </h4>
+                        <div id="seccion-diagnosticos-nuevo" style="display:none;">
+                            <div id="lista-diagnosticos-nuevo"></div>
+                            <div class="form-grid-2">
+                                <div class="form-group">
+                                    <label>Descripción *</label>
+                                    <input type="text" id="nuevo-diag-descripcion">
+                                </div>
+                                <div class="form-group">
+                                    <label>Tipo *</label>
+                                    <input type="text" id="nuevo-diag-tipo">
+                                </div>
+                                <div class="form-group">
+                                    <label>Fecha</label>
+                                    <input type="date" id="nuevo-diag-fecha">
+                                </div>
+                            </div>
+                            <button type="button" class="btn-secondary" onclick="agregarDiagnosticoNuevo()">➕ Agregar Diagnóstico</button>
+                        </div>
+                    </div>
+
+                    <div class="form-seccion">
+                        <h4 class="form-seccion-titulo collapsible" onclick="toggleSeccion('seccion-medicamentos-nuevo', this)">
+                            💊 Medicamentos <span class="seccion-badge">Opcional</span>
+                        </h4>
+                        <div id="seccion-medicamentos-nuevo" style="display:none;">
+                            <div id="lista-medicamentos-nuevo"></div>
+                            <div class="form-grid-2">
+                                <div class="form-group">
+                                    <label>Nombre *</label>
+                                    <input type="text" id="nuevo-med-nombre">
+                                </div>
+                                <div class="form-group">
+                                    <label>Dosis</label>
+                                    <input type="text" id="nuevo-med-dosis">
+                                </div>
+                                <div class="form-group">
+                                    <label>Fecha Inicio</label>
+                                    <input type="date" id="nuevo-med-inicio">
+                                </div>
+                                <div class="form-group">
+                                    <label>Fecha Fin</label>
+                                    <input type="date" id="nuevo-med-fin">
+                                </div>
+                            </div>
+                            <button type="button" class="btn-secondary" onclick="agregarMedicamentoNuevo()">➕ Agregar Medicamento</button>
+                        </div>
+                    </div>
+
+                    <p id="usuario-mensaje-error" class="mensaje-error"></p>
+                    <button type="button" class="btn-primary" style="margin-top:20px; width:100%;" onclick="guardarUsuario()">💾 Guardar Usuario</button>
+                </form>
+            </div>
+        </div>
+
+    <script src="/static/js/usuarios.js"></script>
+</body>
+</html>

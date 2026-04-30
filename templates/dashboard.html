@@ -15,7 +15,7 @@
         </div>
         <ul class="sidebar-menu">
             <li><a href="/dashboard" class="active">📊 Resumen</a></li>
-            <li><a href="#" onclick="abrirModalUsuario()">👥 Nuevo Usuario</a></li>
+            <li><a href="/usuarios">👥 Usuarios</a></li>
             <li><a href="#" onclick="alert('Próximamente...')">📅 Agenda</a></li>
             <li><a href="#" onclick="alert('Cargando Dashboard Financiero...')">💰 Finanzas</a></li>
         </ul>
@@ -69,32 +69,127 @@
 
         </main>
     </div>
-    <!-- vista nuevo usuario-->
+    <!-- MODAL NUEVO USUARIO-->
     <div id="modal-usuario" class="modal-overlay">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header">
-                <h2>Registrar Nuevo Usuario</h2>
+                <h2>👤 Registrar Nuevo Usuario</h2>
                 <button class="btn-close" onclick="cerrarModalUsuario()">&times;</button>
             </div>
+
             <form id="form-usuario">
-                <div class="form-group">
-                    <label for="usuario-rut">RUT</label>
-                    <input type="text" id="usuario-rut" placeholder="Ej: 12345678-9" required>
+
+                <!-- SECCIÓN 1: DATOS OBLIGATORIOS -->
+                <div class="form-seccion">
+                    <h4 class="form-seccion-titulo">📋 Datos Básicos</h4>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label>RUT *</label>
+                            <input type="text" id="usuario-rut" placeholder="Ej: 12345678-9">
+                        </div>
+                        <div class="form-group">
+                            <label>Nombre Completo *</label>
+                            <input type="text" id="usuario-nombre" placeholder="Ej: Juan Pérez">
+                        </div>
+                        <div class="form-group">
+                            <label>Fecha de Nacimiento *</label>
+                            <input type="date" id="usuario-fecha-nacimiento">
+                        </div>
+                        <div class="form-group">
+                            <label>Teléfono 1</label>
+                            <input type="text" id="usuario-telefono1" placeholder="Ej: +56912345678">
+                        </div>
+                        <div class="form-group">
+                            <label>Nombre Tutor</label>
+                            <input type="text" id="usuario-tutor" placeholder="Ej: María González">
+                        </div>
+                        <div class="form-group">
+                            <label>Establecimiento Educacional</label>
+                            <input type="text" id="usuario-establecimiento" placeholder="Ej: Escuela Villa Alegre">
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="usuario-nombre">Nombre Completo</label>
-                    <input type="text" id="usuario-nombre" placeholder="Ej: Juan Pérez" required>
+
+                <!-- SECCIÓN 2: DATOS ADICIONALES -->
+                <div class="form-seccion">
+                    <h4 class="form-seccion-titulo collapsible" onclick="toggleSeccion('seccion-adicional', this)">
+                        ➕ Datos Adicionales <span class="seccion-badge">Opcional</span>
+                    </h4>
+                    <div id="seccion-adicional" style="display:none;">
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label>Teléfono 2</label>
+                                <input type="text" id="usuario-telefono2" placeholder="Ej: +56987654321">
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" id="usuario-email" placeholder="correo@ejemplo.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Tarifa Pactada</label>
+                                <input type="number" id="usuario-tarifa" placeholder="Ej: 35000">
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="usuario-email">Correo Electrónico</label>
-                    <input type="email" id="usuario-email" placeholder="correo@ejemplo.com" required>
+
+                <!-- SECCIÓN 3: DIAGNÓSTICOS -->
+                <div class="form-seccion">
+                    <h4 class="form-seccion-titulo collapsible" onclick="toggleSeccion('seccion-diagnosticos-nuevo', this)">
+                        📋 Diagnósticos <span class="seccion-badge">Opcional</span>
+                    </h4>
+                    <div id="seccion-diagnosticos-nuevo" style="display:none;">
+                        <div id="lista-diagnosticos-nuevo"></div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label>Descripción *</label>
+                                <input type="text" id="nuevo-diag-descripcion" placeholder="Ej: Trastorno del desarrollo">
+                            </div>
+                            <div class="form-group">
+                                <label>Tipo *</label>
+                                <input type="text" id="nuevo-diag-tipo" placeholder="Ej: CIE-10">
+                            </div>
+                            <div class="form-group">
+                                <label>Fecha</label>
+                                <input type="date" id="nuevo-diag-fecha">
+                            </div>
+                        </div>
+                        <button type="button" class="btn-secondary" onclick="agregarDiagnosticoNuevo()">➕ Agregar Diagnóstico</button>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="usuario-password">Contraseña Temporal</label>
-                    <input type="password" id="usuario-password" required>
+
+                <!-- SECCIÓN 4: MEDICAMENTOS -->
+                <div class="form-seccion">
+                    <h4 class="form-seccion-titulo collapsible" onclick="toggleSeccion('seccion-medicamentos-nuevo', this)">
+                        💊 Medicamentos <span class="seccion-badge">Opcional</span>
+                    </h4>
+                    <div id="seccion-medicamentos-nuevo" style="display:none;">
+                        <div id="lista-medicamentos-nuevo"></div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label>Nombre *</label>
+                                <input type="text" id="nuevo-med-nombre" placeholder="Ej: Ritalin">
+                            </div>
+                            <div class="form-group">
+                                <label>Dosis</label>
+                                <input type="text" id="nuevo-med-dosis" placeholder="Ej: 10mg">
+                            </div>
+                            <div class="form-group">
+                                <label>Fecha Inicio</label>
+                                <input type="date" id="nuevo-med-inicio">
+                            </div>
+                            <div class="form-group">
+                                <label>Fecha Fin</label>
+                                <input type="date" id="nuevo-med-fin">
+                            </div>
+                        </div>
+                        <button type="button" class="btn-secondary" onclick="agregarMedicamentoNuevo()">➕ Agregar Medicamento</button>
+                    </div>
                 </div>
-                <p id="modal-mensaje-error" class="mensaje-error"></p>
-                <button type="button" class="btn-primary" onclick="guardarUsuario()">💾 Guardar Usuario</button>
+
+                <p id="usuario-mensaje-error" class="mensaje-error"></p>
+                <button type="button" class="btn-primary" style="margin-top:20px; width:100%;" onclick="guardarUsuario()">💾 Guardar Usuario</button>
+
             </form>
         </div>
     </div>

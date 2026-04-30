@@ -3,6 +3,7 @@ const API = "http://127.0.0.1:8000";
 let usuarioActivoId = null;
 let reservaActivaId = null;
 
+
 // --- LOGIN ---
 async function iniciarSesion() {
     const email = document.getElementById("email").value;
@@ -182,7 +183,7 @@ async function cargarProximosDias() {
                                         </div>
                                     </td>
                                     <td style="text-align:right;">
-                                        <button class="btn-atencion" onclick="abrirModalAtencion(${c.reserva_id}, ${c.usuario_id})">
+                                        <button class="btn-atencion" onclick="verFichaUsuario(${c.usuario_id})">
                                             📁 Ver Ficha
                                         </button>
                                     </td>
@@ -317,6 +318,9 @@ async function abrirModalAtencion(reservaId, usuarioId) {
         alert("No se pudo cargar la información del usuario.");
     }
 }
+function verFichaUsuario(usuarioId) {
+    window.location.href = `/usuarios/${usuarioId}`;
+}
 //-- crear el link de + n° más de los diagnosticos del usuario
 function toggleDiagnosticos(el) {
     const wrapper = el.closest('.diagnosticos-wrapper');
@@ -388,18 +392,6 @@ async function cargarDiagnosticos() {
             </div>
         </div>
     `).join('');
-}
-function toggleEditarDiagnostico(id) {
-    const vista = document.getElementById(`diag-vista-${id}`);
-    const edicion = document.getElementById(`diag-edicion-${id}`);
-    const btn = document.getElementById(`btn-edit-diag-${id}`);
-
-    if (edicion.style.display === 'none') {
-        vista.style.display = 'none';
-        edicion.style.display = 'block';
-        btn.textContent = '💾';
-        btn.onclick = () => guardarEditarDiagnostico(id);
-    }
 }
 function editarDiagnostico(id, descripcion, tipo, fecha) {
     document.getElementById('diag-edit-id').value = id;
@@ -482,18 +474,6 @@ async function cargarMedicamentos() {
         </div>
     `).join('');
 }
-function toggleEditarMedicamento(id) {
-    const vista = document.getElementById(`med-vista-${id}`);
-    const edicion = document.getElementById(`med-edicion-${id}`);
-    const btn = document.getElementById(`btn-edit-med-${id}`);
-
-    if (edicion.style.display === 'none') {
-        vista.style.display = 'none';
-        edicion.style.display = 'block';
-        btn.textContent = '💾';
-        btn.onclick = () => guardarEditarMedicamento(id);
-    }
-}
 function editarMedicamento(id, nombre, dosis, fechaInicio, fechaFin) {
     document.getElementById('med-edit-id').value = id;
     document.getElementById('med-nombre').value = nombre;
@@ -552,44 +532,7 @@ async function eliminarMedicamento(id) {
     await cargarMedicamentos();
 }
 
-// --- LÓGICA USUARIOS ---
 
-// Menú "Nuevo Usuario"
-function abrirModalUsuario() {
-    document.getElementById('modal-usuario').style.display = 'flex';
-}
-function cerrarModalUsuario() {
-    document.getElementById('modal-usuario').style.display = 'none';
-    document.getElementById('form-usuario').reset();
-}
-async function guardarUsuario(event) {
-    if(event) event.preventDefault();
-    const profesionalId = localStorage.getItem('profesional_id');
-    const datos = {
-        rut: document.getElementById('usuario-rut').value,
-        nombre: document.getElementById('usuario-nombre').value,
-        email: document.getElementById('usuario-email').value,
-        password: document.getElementById('usuario-password').value,
-        profesional_id: parseInt(profesionalId)
-    };
-
-    try {
-        const response = await fetch(`${API}/usuarios/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(datos)
-        });
-
-        if (response.ok) {
-            alert("Usuario registrado con éxito");
-            cerrarModalUsuario();
-            cargarResumen();
-            cargarProximasCitas(); 
-        }
-    } catch (error) {
-        console.error("Error guardando usuario");
-    }
-}
 
 // Dentro de "Sesiones de Hoy" boton "registrar"
 function cambiarTab(tab) {

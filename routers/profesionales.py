@@ -44,6 +44,7 @@ def login(datos: schemas.LoginSchema, db: Session = Depends(get_db)):
     return {
         "mensaje": "Login exitoso",
         "profesional_id": profesional.id,
-        "nombre": profesional.nombre
+        "nombre": profesional.nombre,
+        "email": profesional.email
     }
 

@@ -20,7 +20,15 @@ class Usuario(Base):
     fecha_nacimiento = Column(Date)
     establecimiento_educacional = Column(String, nullable=True)
     nombre_tutor = Column(String, nullable=True)
-    
+    telefono_1 = Column(String, nullable=True)
+    telefono_2 = Column(String, nullable=True)  
+    tarifa_pactada = Column(Integer, nullable=True)
+    estado = Column(String, default="en_tto")
+    foto_url = Column(String, nullable=True)
+    reservas = relationship("Reserva", back_populates="usuario")
+    ingresos = relationship("Ingreso", back_populates="usuario")
+    ciclos = relationship("Ciclo", back_populates="usuario")    
+
     # --- FINANZAS ---
     tarifa_pactada = Column(Integer, nullable=True) 
 
@@ -155,3 +163,4 @@ class Informe(Base):
     profesional_id = Column(Integer, ForeignKey("profesionales.id"))
     contenido = Column(Text)
     fecha = Column(Date)
+

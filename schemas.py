@@ -12,6 +12,7 @@ class UsuarioCrear(BaseModel):
     nombre_tutor: Optional[str] = None
     establecimiento_educacional: Optional[str] = None
     tarifa_pactada: Optional[int] = None
+    foto_url: Optional[str] = None
 class UsuarioRespuesta(BaseModel):
     id: int
     nombre: str
@@ -22,6 +23,7 @@ class UsuarioRespuesta(BaseModel):
     email: Optional[str] = None
     nombre_tutor: Optional[str] = None
     establecimiento_educacional: Optional[str] = None
+    foto_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -159,8 +161,8 @@ class EvaluacionIndicadorRespuesta(BaseModel):
     cumplido: bool
     observacion: Optional[str] = None
 
-class Config:
-    from_attributes = True
+    class Config:
+        from_attributes = True
 
 class InformeCrear(BaseModel):
     ciclo_id: int

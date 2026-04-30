@@ -1,7 +1,13 @@
-from fastapi import FastAPI
+import os
+import shutil
+
+from database import get_db, engine
+from fastapi import FastAPI, Depends, HTTPException, File, UploadFile
+from sqlalchemy.orm import Session
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from routers import usuarios, profesionales, bloques_horario, reservas, ciclos, sesiones, objetivos, indicadores, informes, dashboard, finanzas, diagnosticos, medicamentos
+
 
 app = FastAPI()
 
@@ -29,3 +35,27 @@ def inicio():
 def dashboard():
     return FileResponse("templates/dashboard.html")
 
+@app.get("/usuarios")
+def pagina_usuarios():
+    return FileResponse("templates/usuarios.html")
+
+@app.post("/usuarios/{usuario_id}/foto")
+async def subir_foto(usuario_id: int, foto: UploadFile = File(...), db: Session = Depends(get_db)):
+    from models import Usuario
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    os.makedirs("static/fotos", exist_ok=True)
+    extension = foto.filename.split(".")[-1]
+    nombre_archivo = f"usuario_{usuario_id}.{extension}"
+    ruta = f"static/fotos/{nombre_archivo}"
+    
+    with open(ruta, "wb") as buffer:
+        shutil.copyfileobj(foto.file, buffer)
+    
+    foto_url = f"/static/fotos/{nombre_archivo}"
+    usuario.foto_url = foto_url
+    db.commit()
+    
+    return {"foto_url": foto_url}
