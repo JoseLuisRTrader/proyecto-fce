@@ -319,7 +319,7 @@ async function abrirModalAtencion(reservaId, usuarioId) {
     }
 }
 function verFichaUsuario(usuarioId) {
-    window.location.href = `/usuarios/${usuarioId}`;
+    window.location.href = `/ficha/${usuarioId}`;
 }
 //-- crear el link de + n° más de los diagnosticos del usuario
 function toggleDiagnosticos(el) {
@@ -602,3 +602,6 @@ async function guardarDatosUsuario() {
     }
 }
 
+function abrirFichaClinica() {
+    window.location.href = `/ficha/${usuarioActivoId}`;
+}

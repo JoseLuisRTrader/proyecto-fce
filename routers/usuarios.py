@@ -11,6 +11,8 @@ router = APIRouter(
     tags=["Usuarios"]
 )
 
+
+
 @router.post("/", response_model=schemas.UsuarioRespuesta)
 def crear_usuario(usuario: schemas.UsuarioCrear, db: Session = Depends(get_db)):
     db_usuario = db.query(models.Usuario).filter(models.Usuario.rut == usuario.rut).first()
@@ -105,3 +107,45 @@ def actualizar_usuario(usuario_id: int, datos: schemas.UsuarioActualizar, db: Se
     db.refresh(usuario)
     return usuario
 
+@router.get("/{usuario_id}/ficha")
+def obtener_ficha_completa(usuario_id: int, db: Session = Depends(get_db)):
+    user = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    hoy = date.today()
+    edad = hoy.year - user.fecha_nacimiento.year - (
+        (hoy.month, hoy.day) < (user.fecha_nacimiento.month, user.fecha_nacimiento.day)
+    )
+
+    diagnosticos = db.query(models.Diagnostico).filter(
+        models.Diagnostico.usuario_id == usuario_id
+    ).all()
+
+    medicamentos = db.query(models.Medicamento).filter(
+        models.Medicamento.usuario_id == usuario_id
+    ).all()
+
+    ciclos = db.query(models.Ciclo).filter(
+        models.Ciclo.usuario_id == usuario_id
+    ).order_by(models.Ciclo.fecha_inicio.desc()).all()
+
+    return {
+        "id": user.id,
+        "nombre": user.nombre,
+        "rut": user.rut,
+        "edad": edad,
+        "fecha_nacimiento": str(user.fecha_nacimiento),
+        "telefono_1": user.telefono_1,
+        "telefono_2": user.telefono_2,
+        "email": user.email,
+        "nombre_tutor": user.nombre_tutor,
+        "establecimiento_educacional": user.establecimiento_educacional,
+        "tarifa_pactada": user.tarifa_pactada,
+        "estado": user.estado or "en_tto",
+        "foto_url": user.foto_url,
+        "diagnosticos": [{"id": d.id, "descripcion": d.descripcion, "tipo": d.tipo, "fecha": str(d.fecha) if d.fecha else None} for d in diagnosticos],
+        "medicamentos": [{"id": m.id, "nombre": m.nombre, "dosis": m.dosis, "fecha_inicio": str(m.fecha_inicio) if m.fecha_inicio else None, "fecha_fin": str(m.fecha_fin) if m.fecha_fin else None} for m in medicamentos],
+        "ciclos": [{"id": c.id, "fecha_inicio": str(c.fecha_inicio), "numero_sesiones": c.numero_sesiones, "estado": c.estado} for c in ciclos],
+        "total_sesiones": sum(c.numero_sesiones for c in ciclos)
+    }

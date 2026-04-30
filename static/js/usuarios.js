@@ -190,7 +190,7 @@ function renderCompacta(usuarios) {
 }
 
 function verUsuario(id) {
-    window.location.href = `/usuarios/${id}`;
+    window.location.href = `/ficha/${id}`;
 }
 
 function editarUsuario(id) {

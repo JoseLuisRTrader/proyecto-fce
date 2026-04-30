@@ -59,3 +59,7 @@ async def subir_foto(usuario_id: int, foto: UploadFile = File(...), db: Session 
     db.commit()
     
     return {"foto_url": foto_url}
+
+@app.get("/ficha/{usuario_id}")
+def pagina_ficha_usuario(usuario_id: int):
+    return FileResponse("templates/ficha_usuario.html")
