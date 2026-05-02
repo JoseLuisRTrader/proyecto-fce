@@ -50,53 +50,85 @@ def obtener_usuario(usuario_id: int, db: Session = Depends(get_db)):
 @router.get("/detalle-atencion/{usuario_id}")
 def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
     user = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
-    
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
-    # Cálculo de edad
+
     hoy = date.today()
     edad = hoy.year - user.fecha_nacimiento.year - (
         (hoy.month, hoy.day) < (user.fecha_nacimiento.month, user.fecha_nacimiento.day)
     )
-    
-    # Conteo de sesiones
+
     total_sesiones = db.query(models.Sesion).join(models.Ciclo).filter(
         models.Ciclo.usuario_id == usuario_id
     ).count()
-    
-    # Diagnósticos
-    diagnosticos = db.query(models.Diagnostico).filter(
-    models.Diagnostico.usuario_id == usuario_id
+
+    diag = db.query(models.Diagnostico).filter(
+        models.Diagnostico.usuario_id == usuario_id
     ).all()
 
-    return {
-        "nombre": user.nombre,
-        "edad": edad,
-        "nombre_tutor": user.nombre_tutor,
-        "ultimo_diagnostico": diagnosticos[0].descripcion if diagnosticos else "Sin diagnóstico registrado",
-        "diagnosticos": [{"id": d.id, "descripcion": d.descripcion, "tipo": d.tipo} for d in diagnosticos],
-        "total_sesiones": total_sesiones,
-        "tarifa_pactada": None,
-        "indicadores": [],
-        "foto_url": None
-    }
+    # Ciclo activo
+    ciclo_activo = db.query(models.Ciclo).filter(
+        models.Ciclo.usuario_id == usuario_id,
+        models.Ciclo.estado == "activo"
+    ).first()
 
-    # Nombre tutor
+    es_primera_sesion = False
+    sesion_id_activa = None
+    indicadores = []
+    sesiones_ciclo_count = 0
+
+    if ciclo_activo:
+        sesiones_ciclo_count = db.query(models.Sesion).filter(
+            models.Sesion.ciclo_id == ciclo_activo.id
+        ).count()
+        es_primera_sesion = sesiones_ciclo_count == 0
+
+        # Sesión de hoy
+        sesion_hoy = db.query(models.Sesion).join(models.Reserva).join(models.BloqueHorario).filter(
+            models.Sesion.ciclo_id == ciclo_activo.id,
+            models.BloqueHorario.fecha == hoy
+        ).first()
+        if sesion_hoy:
+            sesion_id_activa = sesion_hoy.id
+
+        # Indicadores del ciclo activo con su evaluación más reciente
+        objetivos = db.query(models.Objetivo).filter(
+            models.Objetivo.ciclo_id == ciclo_activo.id
+        ).all()
+
+        for obj in objetivos:
+            inds = db.query(models.IndicadorLogro).filter(
+                models.IndicadorLogro.objetivo_id == obj.id
+            ).all()
+            for ind in inds:
+                ultima_eval = db.query(models.EvaluacionIndicador).filter(
+                    models.EvaluacionIndicador.indicador_id == ind.id
+                ).order_by(models.EvaluacionIndicador.id.desc()).first()
+                indicadores.append({
+                    "id": ind.id,
+                    "descripcion": ind.descripcion,
+                    "objetivo": obj.descripcion,
+                    "cumplido": ultima_eval.cumplido if ultima_eval else None
+                })
+
     nombre_tutor = user.nombre_tutor or "No asignado"
 
     return {
         "nombre": user.nombre,
         "edad": edad,
         "nombre_tutor": nombre_tutor,
-        "ultimo_diagnostico": diag.descripcion if diag else "Sin diagnóstico registrado",
+        "ultimo_diagnostico": diag[0].descripcion if diag else "Sin diagnóstico registrado",
+        "diagnosticos": [{"id": d.id, "descripcion": d.descripcion, "tipo": d.tipo} for d in diag],
         "total_sesiones": total_sesiones,
-        "tarifa_pactada": None,
-        "indicadores": [],
-        "foto_url": None
+        "tarifa_pactada": user.tarifa_pactada,
+        "indicadores": indicadores,
+        "foto_url": user.foto_url,
+        "es_primera_sesion": es_primera_sesion,
+        "ciclo_activo_id": ciclo_activo.id if ciclo_activo else None,
+        "sesion_id_activa": sesion_id_activa,
+        "sesiones_ciclo_actual": sesiones_ciclo_count
     }
 
-@router.put("/{usuario_id}", response_model=schemas.UsuarioRespuesta)
 def actualizar_usuario(usuario_id: int, datos: schemas.UsuarioActualizar, db: Session = Depends(get_db)):
     usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
     if not usuario:

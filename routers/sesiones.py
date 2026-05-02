@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import SessionLocal, get_db
 import models, schemas
+from datetime import date
 
 router = APIRouter(
     prefix="/sesiones",
@@ -72,30 +73,57 @@ def sesiones_por_ciclo(ciclo_id: int, db: Session = Depends(get_db)):
 # routers/sesiones.py
 @router.post("/registrar-atencion")
 def registrar_atencion(data: dict, db: Session = Depends(get_db)):
-    # 1. Crear la Sesión Clínica
-    nueva_sesion = models.Sesion(
-        ciclo_id=data['ciclo_id'],
-        reserva_id=data['reserva_id'],
-        actividades=data['actividades'],
-        fecha=date.today()
-    )
-    db.add(nueva_sesion)
-    
-    # 2. Crear el Registro Financiero (Ingreso)
+    reserva_id = data['reserva_id']
+    usuario_id = data['usuario_id']
+
+    # Buscar sesión existente para esta reserva
+    sesion = db.query(models.Sesion).filter(
+        models.Sesion.reserva_id == reserva_id
+    ).first()
+
+    if sesion:
+        # Actualizar sesión existente
+        sesion.actividades = data.get('actividades')
+        sesion.fecha = date.today()
+    else:
+        # Buscar ciclo activo del usuario
+        ciclo = db.query(models.Ciclo).filter(
+            models.Ciclo.usuario_id == usuario_id,
+            models.Ciclo.estado == "activo"
+        ).first()
+
+        if not ciclo:
+            raise HTTPException(status_code=404, detail="No hay ciclo activo")
+
+        sesion = models.Sesion(
+            ciclo_id=ciclo.id,
+            reserva_id=reserva_id,
+            actividades=data.get('actividades'),
+            fecha=date.today(),
+            numero_sesion=ciclo.numero_sesiones + 1,
+            es_ingreso=ciclo.numero_sesiones == 0
+        )
+        db.add(sesion)
+        ciclo.numero_sesiones += 1
+
+    # Crear ingreso financiero
     nuevo_ingreso = models.Ingreso(
-        usuario_id=data['usuario_id'],
+        usuario_id=usuario_id,
         concepto=f"Sesión - {date.today().strftime('%d/%m/%Y')}",
-        monto=data['monto'],
-        estado=data['estado_pago'],
-        metodo_pago=data.get('metodo_pago')
+        monto=data.get('monto', 0),
+        estado=data.get('estado_pago', 'pendiente'),
+        metodo_pago=data.get('metodo_pago'),
+        sesion_id=sesion.id if sesion.id else None
     )
     db.add(nuevo_ingreso)
-    
-    # 3. Marcar la reserva como 'asistio'
-    reserva = db.query(models.Reserva).get(data['reserva_id'])
+
+    # Marcar reserva como asistida
+    reserva = db.query(models.Reserva).filter(
+        models.Reserva.id == reserva_id
+    ).first()
     if reserva:
         reserva.estado = "asistio"
-        
+
     db.commit()
     return {"status": "success"}
 
@@ -153,3 +181,50 @@ def actualizar_sesion(sesion_id: int, datos: schemas.SesionActualizar, db: Sessi
     db.commit()
     db.refresh(sesion)
     return {"mensaje": "Sesión actualizada"}
+
+@router.post("/crear-ingreso")
+def crear_sesion_ingreso(datos: dict, db: Session = Depends(get_db)):
+    ciclo_id = datos.get("ciclo_id")
+    reserva_id = datos.get("reserva_id")
+    
+    # Verificar si ya existe sesión de ingreso
+    existente = db.query(models.Sesion).filter(
+        models.Sesion.ciclo_id == ciclo_id,
+        models.Sesion.es_ingreso == True
+    ).first()
+    
+    if existente:
+        return {"id": existente.id, "creada": False}
+    
+    nueva = models.Sesion(
+        ciclo_id=ciclo_id,
+        reserva_id=reserva_id,
+        fecha=date.today(),
+        numero_sesion=1,
+        es_ingreso=True
+    )
+    db.add(nueva)
+    
+    # Actualizar contador del ciclo
+    ciclo = db.query(models.Ciclo).filter(models.Ciclo.id == ciclo_id).first()
+    if ciclo:
+        ciclo.numero_sesiones += 1
+    
+    db.commit()
+    db.refresh(nueva)
+    return {"id": nueva.id, "creada": True}
+
+@router.get("/por-reserva/{reserva_id}")
+def obtener_sesion_por_reserva(reserva_id: int, db: Session = Depends(get_db)):
+    sesion = db.query(models.Sesion).filter(
+        models.Sesion.reserva_id == reserva_id
+    ).first()
+    if not sesion:
+        raise HTTPException(status_code=404, detail="Sin sesión registrada")
+    return {
+        "id": sesion.id,
+        "actividades": sesion.actividades,
+        "materiales": sesion.materiales,
+        "compromisos": sesion.compromisos,
+        "fecha": str(sesion.fecha) if sesion.fecha else None
+    }

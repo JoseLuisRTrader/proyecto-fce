@@ -89,37 +89,35 @@ async function cargarProximasCitas() {
         `;
 
         citas.forEach(cita => {
-            // Eliminada la validación de hora: siempre abre el modal y siempre usa el estilo azul
-            const onclickAccion = `abrirModalAtencion(${cita.reserva_id}, ${cita.usuario_id})`;
-            const btnClase = "btn-atencion";
-            const btnTexto = "📝 Registrar";
-            const colorSemaforo = cita.semaforo || "#cbd5e1"; 
+        const btnClase = cita.tiene_registro ? "btn-registrado" : "btn-atencion";
+        const btnTexto = cita.tiene_registro ? "✅ Registrado" : "📝 Registrar";
+        const onclickAccion = `abrirModalAtencion(${cita.reserva_id}, ${cita.usuario_id})`;
+        const colorSemaforo = cita.semaforo || "#cbd5e1";
+        const fotoUrl = cita.foto_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(cita.nombre)}&background=2563eb&color=fff`;
 
-            const fotoUrl = cita.foto_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(cita.nombre)}&background=2563eb&color=fff`;
-
-            html += `
-                <tr>
-                    <td style="text-align:center;">
-                        <span class="semaforo-dot" style="background-color: ${colorSemaforo};"></span>
-                    </td>
-                    <td><b class="hora-texto">${cita.hora}</b></td>
-                    <td>
-                        <div class="user-cell">
-                            <img src="${fotoUrl}" class="avatar-small" alt="Foto">
-                            <div class="usuario-info">
-                                <span class="usuario-nombre">${cita.nombre}</span>
-                                <span class="usuario-rut">${cita.rut}</span>
-                            </div>
+        html += `
+            <tr>
+                <td style="text-align:center;">
+                    <span class="semaforo-dot" style="background-color: ${colorSemaforo};"></span>
+                </td>
+                <td><b class="hora-texto">${cita.hora}</b></td>
+                <td>
+                    <div class="user-cell">
+                        <img src="${fotoUrl}" class="avatar-small" alt="Foto">
+                        <div class="usuario-info">
+                            <span class="usuario-nombre">${cita.nombre}</span>
+                            <span class="usuario-rut">${cita.rut}</span>
                         </div>
-                    </td>
-                    <td style="text-align: right;">
-                        <button class="${btnClase}" onclick="${onclickAccion}">
-                            ${btnTexto}
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
+                    </div>
+                </td>
+                <td style="text-align: right;">
+                    <button class="${btnClase}" onclick="${onclickAccion}">
+                        ${btnTexto}
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
 
         html += '</tbody></table>';
         contenedor.innerHTML = html;
@@ -244,6 +242,23 @@ async function abrirModalAtencion(reservaId, usuarioId) {
         document.getElementById('atencion-nombre-usuario').innerText = data.nombre;
         document.getElementById('atencion-edad').innerText = data.edad;
         document.getElementById('atencion-tutor').innerText = data.nombre_tutor || "No asignado";
+        // Detectar si es primera sesión
+        if (data.es_primera_sesion) {
+            modal.style.display = 'none';
+            console.log("reservaId:", reservaId, "usuarioId:", usuarioId, "ciclo:", data.ciclo_activo_id);
+            window.location.href = `/ficha/${usuarioId}?ingreso=true&ciclo=${data.ciclo_activo_id}&reserva=${reservaId}`;
+            return;
+        }
+        // Cargar sesión existente si hay registro previo
+        const sesionRes = await fetch(`${API}/sesiones/por-reserva/${reservaId}`);
+        if (sesionRes.ok) {
+            const sesionExistente = await sesionRes.json();
+            if (sesionExistente && sesionExistente.actividades) {
+                document.getElementById('atencion-actividades').value = sesionExistente.actividades || '';
+                document.getElementById('atencion-monto').value = sesionExistente.monto || data.tarifa_pactada || 35000;
+            }
+        }
+
         // Diagnósticos con ver más
         const diagnosticos = data.diagnosticos || [];
         const wrapper = document.getElementById('atencion-diagnosticos-wrapper');
@@ -273,14 +288,15 @@ async function abrirModalAtencion(reservaId, usuarioId) {
         }
 
         // 5. Lógica de primer ingreso y progreso
-        const alertaIngreso = document.getElementById('alerta-primer-ingreso');
-        if (alertaIngreso) {
-            alertaIngreso.style.display = data.total_sesiones === 0 ? 'block' : 'none';
+        // Progreso del ciclo
+        const sesionesCount = document.getElementById('atencion-sesiones-count');
+        if (sesionesCount) {
+            sesionesCount.textContent = data.sesiones_ciclo_actual || 0;
         }
 
         const barraProgreso = document.getElementById('atencion-barra-progreso');
         if (barraProgreso) {
-            const porcentaje = Math.min((data.total_sesiones / 10) * 100, 100);
+            const porcentaje = Math.min(((data.sesiones_ciclo_actual || 0) / 10) * 100, 100);
             barraProgreso.style.width = `${porcentaje}%`;
         }
 
@@ -340,12 +356,11 @@ function cerrarModalAtencion() {
     document.getElementById('atencion-monto').value = '';
 }
 async function finalizarAtencion() {
-    const form = document.getElementById('form-atencion');
     const data = {
-        reserva_id: parseInt(form.dataset.reservaId),
-        usuario_id: parseInt(form.dataset.usuarioId),
+        reserva_id: reservaActivaId,
+        usuario_id: usuarioActivoId,
         actividades: document.getElementById('atencion-actividades').value,
-        monto: parseInt(document.getElementById('atencion-monto').value),
+        monto: parseInt(document.getElementById('atencion-monto').value) || 0,
         estado_pago: document.getElementById('atencion-pago-estado').value
     };
 
@@ -357,7 +372,7 @@ async function finalizarAtencion() {
         });
 
         if (response.ok) {
-            alert("Atención y cobro registrados correctamente");
+            alert("✅ Atención registrada correctamente");
             cerrarModalAtencion();
             location.reload();
         } else {
@@ -605,3 +620,4 @@ async function guardarDatosUsuario() {
 function abrirFichaClinica() {
     window.location.href = `/ficha/${usuarioActivoId}`;
 }
+

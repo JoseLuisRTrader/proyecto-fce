@@ -21,18 +21,11 @@ class Usuario(Base):
     establecimiento_educacional = Column(String, nullable=True)
     nombre_tutor = Column(String, nullable=True)
     telefono_1 = Column(String, nullable=True)
-    telefono_2 = Column(String, nullable=True)  
+    telefono_2 = Column(String, nullable=True)
     tarifa_pactada = Column(Integer, nullable=True)
     estado = Column(String, default="en_tto")
     foto_url = Column(String, nullable=True)
-    reservas = relationship("Reserva", back_populates="usuario")
-    ingresos = relationship("Ingreso", back_populates="usuario")
-    ciclos = relationship("Ciclo", back_populates="usuario")    
 
-    # --- FINANZAS ---
-    tarifa_pactada = Column(Integer, nullable=True) 
-
-    # Relaciones para facilitar reportes
     reservas = relationship("Reserva", back_populates="usuario")
     ingresos = relationship("Ingreso", back_populates="usuario")
     ciclos = relationship("Ciclo", back_populates="usuario")
@@ -45,7 +38,7 @@ class BloqueHorario(Base):
     hora_inicio = Column(String, nullable=False)
     hora_fin = Column(String, nullable=False)
     disponible = Column(Boolean, default=True)
-    
+
     reserva = relationship("Reserva", back_populates="bloque", uselist=False)
 
 class Reserva(Base):
@@ -53,7 +46,7 @@ class Reserva(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     bloque_horario_id = Column(Integer, ForeignKey("bloques_horario.id"))
-    estado = Column(String, default="confirmada") # 'confirmada', 'asistio', 'nsp', 'cancelada'
+    estado = Column(String, default="confirmada")
 
     usuario = relationship("Usuario", back_populates="reservas")
     bloque = relationship("BloqueHorario", back_populates="reserva")
@@ -71,6 +64,7 @@ class Ciclo(Base):
     usuario = relationship("Usuario", back_populates="ciclos")
     objetivos = relationship("Objetivo", back_populates="ciclo")
     sesiones = relationship("Sesion", back_populates="ciclo")
+    anamnesis = relationship("Anamnesis", back_populates="ciclo", uselist=False)
 
 class Objetivo(Base):
     __tablename__ = "objetivos"
@@ -78,7 +72,7 @@ class Objetivo(Base):
     ciclo_id = Column(Integer, ForeignKey("ciclos.id"))
     tipo = Column(String, nullable=False)
     descripcion = Column(Text, nullable=False)
-    
+
     ciclo = relationship("Ciclo", back_populates="objetivos")
     indicadores = relationship("IndicadorLogro", back_populates="objetivo")
 
@@ -87,8 +81,9 @@ class IndicadorLogro(Base):
     id = Column(Integer, primary_key=True, index=True)
     objetivo_id = Column(Integer, ForeignKey("objetivos.id"))
     descripcion = Column(Text, nullable=False)
-    
+
     objetivo = relationship("Objetivo", back_populates="indicadores")
+    evaluaciones = relationship("EvaluacionIndicador", back_populates="indicador")
 
 class Sesion(Base):
     __tablename__ = "sesiones"
@@ -104,33 +99,59 @@ class Sesion(Base):
 
     ciclo = relationship("Ciclo", back_populates="sesiones")
     reserva = relationship("Reserva", back_populates="sesion")
+    evaluaciones = relationship("EvaluacionIndicador", back_populates="sesion")
+
+class Anamnesis(Base):
+    __tablename__ = "anamnesis"
+    id = Column(Integer, primary_key=True, index=True)
+    ciclo_id = Column(Integer, ForeignKey("ciclos.id"), unique=True)
+    motivo_consulta = Column(Text, nullable=True)
+    antecedentes = Column(Text, nullable=True)
+    expectativas_tutor = Column(Text, nullable=True)
+    evaluaciones_aplicadas = Column(Text, nullable=True)
+    area_motora = Column(String, nullable=True)
+    area_cognitiva = Column(String, nullable=True)
+    area_sensorial = Column(String, nullable=True)
+    area_social = Column(String, nullable=True)
+    tiene_fotografia = Column(Boolean, default=False)
+    fecha_registro = Column(Date, default=date.today)
+
+    ciclo = relationship("Ciclo", back_populates="anamnesis")
+
+class EvaluacionIndicador(Base):
+    __tablename__ = "evaluaciones_indicador"
+    id = Column(Integer, primary_key=True, index=True)
+    sesion_id = Column(Integer, ForeignKey("sesiones.id"))
+    indicador_id = Column(Integer, ForeignKey("indicadores_logro.id"))
+    cumplido = Column(Boolean)
+    observacion = Column(Text)
+
+    sesion = relationship("Sesion", back_populates="evaluaciones")
+    indicador = relationship("IndicadorLogro", back_populates="evaluaciones")
 
 class Ingreso(Base):
-    """Módulo de Finanzas: Entradas de dinero"""
     __tablename__ = "ingresos"
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
-    concepto = Column(String, nullable=False) 
-    monto = Column(Integer, nullable=False) 
+    concepto = Column(String, nullable=False)
+    monto = Column(Integer, nullable=False)
     fecha_emision = Column(Date, default=date.today)
-    estado = Column(String, default="pendiente") # "pendiente", "pagado"
-    metodo_pago = Column(String, nullable=True) 
+    estado = Column(String, default="pendiente")
+    metodo_pago = Column(String, nullable=True)
     observaciones = Column(String, nullable=True)
     sesion_id = Column(Integer, ForeignKey("sesiones.id"), nullable=True)
-    informe_id = Column(Integer, ForeignKey("informes.id"), nullable=True) 
+    informe_id = Column(Integer, ForeignKey("informes.id"), nullable=True)
 
     usuario = relationship("Usuario", back_populates="ingresos")
 
 class Gasto(Base):
-    """Módulo de Finanzas: Salidas de dinero"""
     __tablename__ = "gastos"
     id = Column(Integer, primary_key=True, index=True)
-    categoria = Column(String, nullable=False) 
+    categoria = Column(String, nullable=False)
     monto = Column(Integer, nullable=False)
     fecha = Column(Date, default=date.today)
     descripcion = Column(String, nullable=True)
 
-# --- MODELOS SIMPLES RESTANTES ---
 class Diagnostico(Base):
     __tablename__ = "diagnosticos"
     id = Column(Integer, primary_key=True, index=True)
@@ -148,14 +169,6 @@ class Medicamento(Base):
     fecha_inicio = Column(Date)
     fecha_fin = Column(Date)
 
-class EvaluacionIndicador(Base):
-    __tablename__ = "evaluaciones_indicador"
-    id = Column(Integer, primary_key=True, index=True)
-    sesion_id = Column(Integer, ForeignKey("sesiones.id"))
-    indicador_id = Column(Integer, ForeignKey("indicadores_logro.id"))
-    cumplido = Column(Boolean)
-    observacion = Column(Text)
-
 class Informe(Base):
     __tablename__ = "informes"
     id = Column(Integer, primary_key=True, index=True)
@@ -163,4 +176,3 @@ class Informe(Base):
     profesional_id = Column(Integer, ForeignKey("profesionales.id"))
     contenido = Column(Text)
     fecha = Column(Date)
-

@@ -1511,3 +1511,20 @@ input:focus {
     color: #dc2626;
     font-weight: 600;
 }
+/*--boton registrado en el modal de atención profesional para indicar que la sesión ya fue registrada--*/
+
+.btn-registrado {
+    background: #dcfce7;
+    border: 1px solid #22c55e;
+    color: #16a34a;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-registrado:hover {
+    background: #bbf7d0;
+}

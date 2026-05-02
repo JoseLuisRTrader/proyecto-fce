@@ -33,12 +33,12 @@ def obtener_resumen(db: Session = Depends(get_db)):
 def obtener_citas_dia(db: Session = Depends(get_db)):
     hoy = date.today()
     
-    # Unimos Reservas con Usuarios para el nombre y con Bloques para la hora
     citas = db.query(
         models.Reserva.id.label("reserva_id"),
         models.Usuario.id.label("usuario_id"),
         models.Usuario.nombre.label("nombre_usuario"),
         models.Usuario.rut,
+        models.Usuario.foto_url,
         models.BloqueHorario.hora_inicio.label("hora"),
         models.Reserva.estado
     ).join(models.Usuario, models.Reserva.usuario_id == models.Usuario.id)\
@@ -47,20 +47,27 @@ def obtener_citas_dia(db: Session = Depends(get_db)):
      .order_by(models.BloqueHorario.hora_inicio.asc())\
      .all()
 
-    # Formateamos la respuesta para el frontend
     resultado = []
     for c in citas:
-        # Lógica inicial del semáforo (puedes ajustarla después)
-        # Por ahora, simulamos que si tiene más de 3 sesiones es "verde"
-        color_semaforo = "green" if c.reserva_id % 2 == 0 else "yellow" 
-        
+        color_semaforo = "green" if c.reserva_id % 2 == 0 else "yellow"
+
+        # Verificar si ya tiene sesión registrada hoy
+        sesion = db.query(models.Sesion).filter(
+            models.Sesion.reserva_id == c.reserva_id
+        ).first()
+
+        tiene_registro = sesion is not None and sesion.actividades is not None
+
         resultado.append({
+            "reserva_id": c.reserva_id,
             "usuario_id": c.usuario_id,
             "nombre": c.nombre_usuario,
             "rut": c.rut,
             "hora": c.hora,
             "estado": c.estado,
-            "semaforo": color_semaforo
+            "semaforo": color_semaforo,
+            "foto_url": c.foto_url or f"https://ui-avatars.com/api/?name={c.nombre_usuario.replace(' ', '+')}&background=2563eb&color=fff",
+            "tiene_registro": tiene_registro
         })
         
     return resultado

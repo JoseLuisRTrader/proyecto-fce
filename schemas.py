@@ -194,6 +194,8 @@ class UsuarioActualizar(BaseModel):
     nombre_tutor: Optional[str] = None
     establecimiento_educacional: Optional[str] = None
     tarifa_pactada: Optional[int] = None
+    estado: Optional[str] = None
+    foto_url: Optional[str] = None
 
 class DiagnosticoCrear(BaseModel):
     usuario_id: int
@@ -235,3 +237,32 @@ class SesionActualizar(BaseModel):
     actividades: Optional[str] = None
     materiales: Optional[str] = None
     compromisos: Optional[str] = None
+
+class AnamnesisCrear(BaseModel):
+    ciclo_id: int
+    motivo_consulta: Optional[str] = None
+    antecedentes: Optional[str] = None
+    expectativas_tutor: Optional[str] = None
+    evaluaciones_aplicadas: Optional[str] = None
+    area_motora: Optional[str] = None
+    area_cognitiva: Optional[str] = None
+    area_sensorial: Optional[str] = None
+    area_social: Optional[str] = None
+    tiene_fotografia: Optional[bool] = False
+
+class AnamnesisRespuesta(BaseModel):
+    id: int
+    ciclo_id: int
+    motivo_consulta: Optional[str] = None
+    antecedentes: Optional[str] = None
+    expectativas_tutor: Optional[str] = None
+    evaluaciones_aplicadas: Optional[str] = None
+    area_motora: Optional[str] = None
+    area_cognitiva: Optional[str] = None
+    area_sensorial: Optional[str] = None
+    area_social: Optional[str] = None
+    tiene_fotografia: Optional[bool] = False
+    fecha_registro: Optional[date] = None
+
+    class Config:
+        from_attributes = True

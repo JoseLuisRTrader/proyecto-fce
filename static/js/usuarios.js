@@ -16,7 +16,7 @@ const ESTADOS = {
 document.addEventListener('DOMContentLoaded', () => {
     inicializarInterfaz();
     cargarUsuarios();
-});
+});     
 
 function inicializarInterfaz() {
     const nombre = localStorage.getItem('nombre_profesional');

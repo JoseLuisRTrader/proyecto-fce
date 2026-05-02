@@ -6,7 +6,7 @@ from fastapi import FastAPI, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from routers import usuarios, profesionales, bloques_horario, reservas, ciclos, sesiones, objetivos, indicadores, informes, dashboard, finanzas, diagnosticos, medicamentos, ciclos
+from routers import usuarios, profesionales, bloques_horario, reservas, ciclos, sesiones, objetivos, indicadores, informes, dashboard, finanzas, diagnosticos, medicamentos, ciclos, anamnesis
 
 
 app = FastAPI()
@@ -27,6 +27,7 @@ app.include_router(finanzas.router)
 app.include_router(diagnosticos.router)
 app.include_router(medicamentos.router)
 app.include_router(ciclos.router)
+app.include_router(anamnesis.router)
 
 @app.get("/")
 def inicio():

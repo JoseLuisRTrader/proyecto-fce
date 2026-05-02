@@ -12,10 +12,6 @@ const usuarioId = window.location.pathname.split('/').pop();
 let fichaData = null;
 let vistaHistorial = 'compacta';
 
-document.addEventListener('DOMContentLoaded', () => {
-    inicializarInterfaz();
-    cargarFicha();
-});
 
 function inicializarInterfaz() {
     const nombre = localStorage.getItem('nombre_profesional');
@@ -559,31 +555,11 @@ async function abrirSesion(sesionId) {
         const numeroCiclo = fichaData.ciclos.length - fichaData.ciclos.findIndex(c => c.id === sesionData.ciclo_id);
         sesionData.ciclo_numero = numeroCiclo;
 
-        document.getElementById('sesion-modal-titulo').innerHTML = `
-            <div style="display:flex; flex-direction:column; gap:4px;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span>${sesionData.es_ingreso ? '⭐' : '📝'}</span>
-                    <span>Sesión ${sesionData.numero_sesion}</span>
-                    <span class="estado-badge" style="background:#dbeafe; color:#2563eb; font-size:0.75rem;">
-                        Ciclo ${sesionData.ciclo_numero}
-                    </span>
-                </div>
-                <div style="display:flex; gap:8px;">
-                    <span class="tag">👤 ${fichaData.nombre}</span>
-                    <span class="tag">🎂 ${fichaData.edad} años</span>
-                    <span class="tag">🪪 ${fichaData.rut}</span>
-                </div>
-            </div>
-        `;
-
-        document.getElementById('sesion-fecha').value = sesionData.fecha || '';
-        document.getElementById('sesion-actividades').value = sesionData.actividades || '';
-        document.getElementById('sesion-materiales').value = sesionData.materiales || '';
-        document.getElementById('sesion-compromisos').value = sesionData.compromisos || '';
-
-        renderIndicadoresSesion(sesionData.indicadores);
-
-        document.getElementById('modal-sesion').style.display = 'flex';
+        if (sesionData.es_ingreso) {
+            await abrirModalIngreso();
+        } else {
+            abrirModalSesionNormal();
+        }
 
     } catch (error) {
         console.error("Error abriendo sesión:", error);
@@ -591,6 +567,82 @@ async function abrirSesion(sesionId) {
     }
 }
 
+function abrirModalSesionNormal() {
+    const tituloHtml = `
+        <div style="display:flex; flex-direction:column; gap:4px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span>${sesionData.es_ingreso ? '⭐' : '📝'}</span>
+                <span>Sesión ${sesionData.numero_sesion}</span>
+                <span class="estado-badge" style="background:#dbeafe; color:#2563eb; font-size:0.75rem;">
+                    Ciclo ${sesionData.ciclo_numero}
+                </span>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <span class="tag">👤 ${fichaData.nombre}</span>
+                <span class="tag">🎂 ${fichaData.edad} años</span>
+                <span class="tag">🪪 ${fichaData.rut}</span>
+            </div>
+        </div>
+    `;
+    document.getElementById('sesion-modal-titulo').innerHTML = tituloHtml;
+    document.getElementById('sesion-fecha').value = sesionData.fecha || '';
+    document.getElementById('sesion-actividades').value = sesionData.actividades || '';
+    document.getElementById('sesion-materiales').value = sesionData.materiales || '';
+    document.getElementById('sesion-compromisos').value = sesionData.compromisos || '';
+    renderIndicadoresSesion(sesionData.indicadores);
+    document.getElementById('modal-sesion').style.display = 'flex';
+}
+
+async function abrirModalIngreso() {
+    // Cargar anamnesis existente si hay
+    let anamnesis = null;
+    try {
+        const res = await fetch(`${API}/anamnesis/ciclo/${sesionData.ciclo_id}`);
+        if (res.ok) anamnesis = await res.json();
+    } catch (e) {}
+
+    const tituloHtml = `
+        <div style="display:flex; flex-direction:column; gap:4px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span>⭐</span>
+                <span>Sesión de Ingreso</span>
+                <span class="estado-badge" style="background:#fef9c3; color:#854d0e; font-size:0.75rem;">
+                    Ciclo ${sesionData.ciclo_numero}
+                </span>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <span class="tag">👤 ${fichaData.nombre}</span>
+                <span class="tag">🎂 ${fichaData.edad} años</span>
+                <span class="tag">🪪 ${fichaData.rut}</span>
+            </div>
+        </div>
+    `;
+    document.getElementById('ingreso-modal-titulo').innerHTML = tituloHtml;
+
+    // Poblar anamnesis si existe
+    if (anamnesis) {
+        document.getElementById('ing-motivo').value = anamnesis.motivo_consulta || '';
+        document.getElementById('ing-antecedentes').value = anamnesis.antecedentes || '';
+        document.getElementById('ing-expectativas').value = anamnesis.expectativas_tutor || '';
+        document.getElementById('ing-evaluaciones').value = anamnesis.evaluaciones_aplicadas || '';
+        document.getElementById('ing-area-motora').value = anamnesis.area_motora || 'Normal';
+        document.getElementById('ing-area-cognitiva').value = anamnesis.area_cognitiva || 'Normal';
+        document.getElementById('ing-area-sensorial').value = anamnesis.area_sensorial || 'Normal';
+        document.getElementById('ing-area-social').value = anamnesis.area_social || 'Normal';
+        document.getElementById('ing-fotografia').checked = anamnesis.tiene_fotografia || false;
+    }
+
+    // Poblar registro sesión
+    document.getElementById('ing-fecha').value = sesionData.fecha || '';
+    document.getElementById('ing-actividades').value = sesionData.actividades || '';
+    document.getElementById('ing-materiales').value = sesionData.materiales || '';
+    document.getElementById('ing-compromisos').value = sesionData.compromisos || '';
+
+    // Cargar objetivos del ciclo
+    await cargarObjetivosIngreso();
+
+    document.getElementById('modal-ingreso').style.display = 'flex';
+}
 
 function renderIndicadoresSesion(indicadores) {
     const lista = document.getElementById('sesion-indicadores-lista');
@@ -692,4 +744,337 @@ function cerrarModalSesion() {
     document.getElementById('modal-sesion').style.display = 'none';
     sesionActivaId = null;
     sesionData = null;
+}
+
+// ==========================================
+// MODAL INGRESO
+// ==========================================
+
+function cambiarTabIngreso(tab) {
+    document.querySelectorAll('#modal-ingreso .tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('#modal-ingreso .tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`itab-${tab}`).classList.add('active');
+    event.target.classList.add('active');
+}
+
+function cerrarModalIngreso() {
+    document.getElementById('modal-ingreso').style.display = 'none';
+    sessionStorage.removeItem('ingreso_pendiente');
+    sesionActivaId = null;
+    sesionData = null;
+
+    if (window.location.search.includes('ingreso=true')) {
+        window.location.href = '/dashboard';
+    }
+}
+
+async function guardarAnamnesis() {
+    const datos = {
+        ciclo_id: sesionData.ciclo_id,
+        motivo_consulta: document.getElementById('ing-motivo').value || null,
+        antecedentes: document.getElementById('ing-antecedentes').value || null,
+        expectativas_tutor: document.getElementById('ing-expectativas').value || null,
+        evaluaciones_aplicadas: document.getElementById('ing-evaluaciones').value || null,
+        area_motora: document.getElementById('ing-area-motora').value,
+        area_cognitiva: document.getElementById('ing-area-cognitiva').value,
+        area_sensorial: document.getElementById('ing-area-sensorial').value,
+        area_social: document.getElementById('ing-area-social').value,
+        tiene_fotografia: document.getElementById('ing-fotografia').checked
+    };
+
+    const res = await fetch(`${API}/anamnesis/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos)
+    });
+
+    if (res.ok) {
+        alert("✅ Anamnesis guardada correctamente");
+    } else {
+        alert("Error al guardar anamnesis");
+    }
+}
+
+async function guardarRegistroIngreso() {
+    const datos = {
+        fecha: document.getElementById('ing-fecha').value || null,
+        actividades: document.getElementById('ing-actividades').value || null,
+        materiales: document.getElementById('ing-materiales').value || null,
+        compromisos: document.getElementById('ing-compromisos').value || null
+    };
+
+    const res = await fetch(`${API}/sesiones/${sesionActivaId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos)
+    });
+
+    if (res.ok) {
+        alert("✅ Registro guardado correctamente");
+        cerrarModalIngreso();
+        window.location.href = '/dashboard';
+    } else {
+        alert("Error al guardar registro");
+    }
+}
+
+// OBJETIVOS EN INGRESO
+async function cargarObjetivosIngreso() {
+    const res = await fetch(`${API}/objetivos/ciclo/${sesionData.ciclo_id}`);
+    const objetivos = await res.json();
+    const lista = document.getElementById('ing-lista-objetivos');
+
+    if (objetivos.length === 0) {
+        lista.innerHTML = `<p style="color:#94a3b8; font-size:0.85rem;">Sin objetivos definidos</p>`;
+        return;
+    }
+
+    lista.innerHTML = await Promise.all(objetivos.map(async obj => {
+        const resInd = await fetch(`${API}/indicadores/objetivo/${obj.id}`);
+        const indicadores = await resInd.json();
+        return `
+            <div class="ciclo-expandible" style="margin-bottom:8px;">
+                <div style="padding:10px 14px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span class="tag" style="margin-right:8px;">${obj.tipo}</span>
+                            <strong style="font-size:0.9rem;">${obj.descripcion}</strong>
+                        </div>
+                        <button class="btn-eliminar" onclick="eliminarObjetivoIngreso(${obj.id})">🗑️</button>
+                    </div>
+                    <div style="margin-top:8px; padding-left:12px;">
+                        ${indicadores.map(ind => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #f1f5f9;">
+                                <span style="font-size:0.82rem; color:#374151;">→ ${ind.descripcion}</span>
+                                <button class="btn-eliminar" onclick="eliminarIndicadorIngreso(${ind.id})">🗑️</button>
+                            </div>
+                        `).join('')}
+                        <button class="btn-secondary" style="margin-top:8px; font-size:0.8rem; padding:4px 10px;"
+                                onclick="agregarIndicadorIngreso(${obj.id})">➕ Indicador</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    })).then(htmls => htmls.join(''));
+}
+
+async function guardarObjetivoIngreso() {
+    const tipo = document.getElementById('ing-obj-tipo').value.trim();
+    const descripcion = document.getElementById('ing-obj-descripcion').value.trim();
+    if (!tipo || !descripcion) { alert("⚠️ Tipo y descripción son obligatorios"); return; }
+
+    const res = await fetch(`${API}/objetivos/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ciclo_id: sesionData.ciclo_id, tipo, descripcion })
+    });
+
+    if (res.ok) {
+        document.getElementById('ing-obj-tipo').value = '';
+        document.getElementById('ing-obj-descripcion').value = '';
+        await cargarObjetivosIngreso();
+    }
+}
+
+async function eliminarObjetivoIngreso(id) {
+    if (!confirm("¿Eliminar este objetivo?")) return;
+    await fetch(`${API}/objetivos/${id}`, { method: 'DELETE' });
+    await cargarObjetivosIngreso();
+}
+
+async function agregarIndicadorIngreso(objetivoId) {
+    const descripcion = prompt("Descripción del indicador:");
+    if (!descripcion) return;
+    await fetch(`${API}/indicadores/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ objetivo_id: objetivoId, descripcion })
+    });
+    await cargarObjetivosIngreso();
+}
+
+async function eliminarIndicadorIngreso(id) {
+    if (!confirm("¿Eliminar este indicador?")) return;
+    await fetch(`${API}/indicadores/${id}`, { method: 'DELETE' });
+    await cargarObjetivosIngreso();
+}
+
+// DIAGNÓSTICOS EN INGRESO
+async function cargarDiagnosticosIngreso() {
+    const res = await fetch(`${API}/diagnosticos/usuario/${fichaData.id}`);
+    const data = await res.json();
+    const lista = document.getElementById('ing-lista-diagnosticos');
+    if (data.length === 0) {
+        lista.innerHTML = `<p style="color:#94a3b8; font-size:0.85rem;">Sin diagnósticos</p>`;
+        return;
+    }
+    lista.innerHTML = data.map(d => `
+        <div class="item-lista">
+            <div><strong>${d.descripcion}</strong> <span class="tag">${d.tipo}</span></div>
+        </div>
+    `).join('');
+}
+
+async function guardarDiagnosticoIngreso() {
+    const descripcion = document.getElementById('ing-diag-desc').value.trim();
+    const tipo = document.getElementById('ing-diag-tipo').value.trim();
+    if (!descripcion || !tipo) { alert("⚠️ Descripción y tipo son obligatorios"); return; }
+
+    await fetch(`${API}/diagnosticos/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario_id: fichaData.id, descripcion, tipo, fecha: null })
+    });
+    document.getElementById('ing-diag-desc').value = '';
+    document.getElementById('ing-diag-tipo').value = '';
+    await cargarDiagnosticosIngreso();
+}
+
+// MEDICAMENTOS EN INGRESO
+async function cargarMedicamentosIngreso() {
+    const res = await fetch(`${API}/medicamentos/usuario/${fichaData.id}`);
+    const data = await res.json();
+    const lista = document.getElementById('ing-lista-medicamentos');
+    if (data.length === 0) {
+        lista.innerHTML = `<p style="color:#94a3b8; font-size:0.85rem;">Sin medicamentos</p>`;
+        return;
+    }
+    lista.innerHTML = data.map(m => `
+        <div class="item-lista">
+            <div><strong>${m.nombre}</strong> <span class="tag">${m.dosis || 'Sin dosis'}</span></div>
+        </div>
+    `).join('');
+}
+
+async function guardarMedicamentoIngreso() {
+    const nombre = document.getElementById('ing-med-nombre').value.trim();
+    if (!nombre) { alert("⚠️ El nombre es obligatorio"); return; }
+
+    await fetch(`${API}/medicamentos/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            usuario_id: fichaData.id,
+            nombre,
+            dosis: document.getElementById('ing-med-dosis').value || null,
+            fecha_inicio: null,
+            fecha_fin: null
+        })
+    });
+    document.getElementById('ing-med-nombre').value = '';
+    document.getElementById('ing-med-dosis').value = '';
+    await cargarMedicamentosIngreso();
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    inicializarInterfaz();
+    await cargarFicha();
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('ingreso') === 'true') {
+        const cicloId = parseInt(params.get('ciclo'));
+        const reservaId = parseInt(params.get('reserva')) || null;
+        
+        // Guardar datos para crear sesión solo cuando se guarde
+        sessionStorage.setItem('ingreso_pendiente', JSON.stringify({ cicloId, reservaId }));
+        
+        // Abrir modal de ingreso sin crear sesión aún
+        await abrirModalIngresoPendiente(cicloId, reservaId);
+    }
+});
+
+async function abrirModalIngresoPendiente(cicloId, reservaId) {
+    sesionActivaId = null;
+    sesionData = { 
+        ciclo_id: cicloId, 
+        ciclo_numero: fichaData.ciclos.length + 1,
+        es_ingreso: true,
+        actividades: null,
+        fecha: null,
+        materiales: null,
+        compromisos: null,
+        indicadores: []
+    };
+
+    const tituloHtml = `
+        <div style="display:flex; flex-direction:column; gap:4px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span>⭐</span>
+                <span>Sesión de Ingreso</span>
+                <span class="estado-badge" style="background:#fef9c3; color:#854d0e; font-size:0.75rem;">
+                    Ciclo ${sesionData.ciclo_numero}
+                </span>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <span class="tag">👤 ${fichaData.nombre}</span>
+                <span class="tag">🎂 ${fichaData.edad} años</span>
+                <span class="tag">🪪 ${fichaData.rut}</span>
+            </div>
+        </div>
+    `;
+    document.getElementById('ingreso-modal-titulo').innerHTML = tituloHtml;
+
+    // Limpiar campos
+    document.getElementById('ing-motivo').value = '';
+    document.getElementById('ing-antecedentes').value = '';
+    document.getElementById('ing-expectativas').value = '';
+    document.getElementById('ing-evaluaciones').value = '';
+    document.getElementById('ing-area-motora').value = 'Normal';
+    document.getElementById('ing-area-cognitiva').value = 'Normal';
+    document.getElementById('ing-area-sensorial').value = 'Normal';
+    document.getElementById('ing-area-social').value = 'Normal';
+    document.getElementById('ing-fotografia').checked = false;
+    document.getElementById('ing-fecha').value = new Date().toISOString().split('T')[0];
+    document.getElementById('ing-actividades').value = '';
+    document.getElementById('ing-materiales').value = '';
+    document.getElementById('ing-compromisos').value = '';
+
+    await cargarObjetivosIngreso();
+    await cargarDiagnosticosIngreso();
+    await cargarMedicamentosIngreso();
+
+    document.getElementById('modal-ingreso').style.display = 'flex';
+    
+    // Guardar reservaId para usar al guardar
+    document.getElementById('modal-ingreso').dataset.reservaId = reservaId;
+    document.getElementById('modal-ingreso').dataset.cicloId = cicloId;
+}
+
+async function guardarRegistroIngreso() {
+    const modal = document.getElementById('modal-ingreso');
+    const cicloId = parseInt(modal.dataset.cicloId);
+    const reservaId = parseInt(modal.dataset.reservaId) || null;
+
+    // Crear sesión solo ahora que el profesional guarda
+    if (!sesionActivaId) {
+        const resCrear = await fetch(`${API}/sesiones/crear-ingreso`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ciclo_id: cicloId, reserva_id: reservaId })
+        });
+        const creada = await resCrear.json();
+        sesionActivaId = creada.id;
+    }
+
+    const datos = {
+        fecha: document.getElementById('ing-fecha').value || null,
+        actividades: document.getElementById('ing-actividades').value || null,
+        materiales: document.getElementById('ing-materiales').value || null,
+        compromisos: document.getElementById('ing-compromisos').value || null
+    };
+
+    const res = await fetch(`${API}/sesiones/${sesionActivaId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos)
+    });
+
+    if (res.ok) {
+        sessionStorage.removeItem('ingreso_pendiente');
+        alert("✅ Registro guardado correctamente");
+        cerrarModalIngreso();
+        await cargarFicha();
+    } else {
+        alert("Error al guardar registro");
+    }
 }
