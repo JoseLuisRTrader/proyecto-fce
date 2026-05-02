@@ -4,7 +4,7 @@ from database import SessionLocal, get_db
 import models, schemas
 
 router = APIRouter(
-    prefix="/Ciclos",
+    prefix="/ciclos",
     tags=["Ciclos"]
 )
 
@@ -56,3 +56,19 @@ def ciclos_por_usuario(usuario_id: int, db: Session = Depends(get_db)):
     return db.query(models.Ciclo).filter(
         models.Ciclo.usuario_id == usuario_id
     ).all()
+
+@router.get("/{ciclo_id}/sesiones")
+def obtener_sesiones_ciclo(ciclo_id: int, db: Session = Depends(get_db)):
+    sesiones = db.query(models.Sesion).filter(
+        models.Sesion.ciclo_id == ciclo_id
+    ).order_by(models.Sesion.numero_sesion.asc()).all()
+    
+    return [
+        {
+            "id": s.id,
+            "numero_sesion": s.numero_sesion,
+            "fecha": str(s.fecha) if s.fecha else None,
+            "actividades": s.actividades,
+            "es_ingreso": s.es_ingreso
+        } for s in sesiones
+    ]

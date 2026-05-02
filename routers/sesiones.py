@@ -4,7 +4,7 @@ from database import SessionLocal, get_db
 import models, schemas
 
 router = APIRouter(
-    prefix="/Sesiones",
+    prefix="/sesiones",
     tags=["Sesiones"]
 )
 
@@ -98,3 +98,58 @@ def registrar_atencion(data: dict, db: Session = Depends(get_db)):
         
     db.commit()
     return {"status": "success"}
+
+@router.get("/{sesion_id}/detalle")
+def obtener_sesion_detalle(sesion_id: int, db: Session = Depends(get_db)):
+    sesion = db.query(models.Sesion).filter(models.Sesion.id == sesion_id).first()
+    if not sesion:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    
+    evaluaciones = db.query(models.EvaluacionIndicador).filter(
+        models.EvaluacionIndicador.sesion_id == sesion_id
+    ).all()
+
+    # Obtener indicadores del ciclo
+    ciclo = db.query(models.Ciclo).filter(models.Ciclo.id == sesion.ciclo_id).first()
+    objetivos = db.query(models.Objetivo).filter(
+        models.Objetivo.ciclo_id == ciclo.id
+    ).all()
+    
+    indicadores = []
+    for obj in objetivos:
+        inds = db.query(models.IndicadorLogro).filter(
+            models.IndicadorLogro.objetivo_id == obj.id
+        ).all()
+        for ind in inds:
+            eval_ind = next((e for e in evaluaciones if e.indicador_id == ind.id), None)
+            indicadores.append({
+                "id": ind.id,
+                "descripcion": ind.descripcion,
+                "objetivo": obj.descripcion,
+                "cumplido": eval_ind.cumplido if eval_ind else None,
+                "observacion": eval_ind.observacion if eval_ind else None,
+                "evaluacion_id": eval_ind.id if eval_ind else None
+            })
+
+    return {
+        "id": sesion.id,
+        "ciclo_id": sesion.ciclo_id,
+        "numero_sesion": sesion.numero_sesion,
+        "fecha": str(sesion.fecha) if sesion.fecha else None,
+        "actividades": sesion.actividades,
+        "materiales": sesion.materiales,
+        "compromisos": sesion.compromisos,
+        "es_ingreso": sesion.es_ingreso,
+        "indicadores": indicadores
+    }
+
+@router.put("/{sesion_id}")
+def actualizar_sesion(sesion_id: int, datos: schemas.SesionActualizar, db: Session = Depends(get_db)):
+    sesion = db.query(models.Sesion).filter(models.Sesion.id == sesion_id).first()
+    if not sesion:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    for campo, valor in datos.dict(exclude_unset=True).items():
+        setattr(sesion, campo, valor)
+    db.commit()
+    db.refresh(sesion)
+    return {"mensaje": "Sesión actualizada"}

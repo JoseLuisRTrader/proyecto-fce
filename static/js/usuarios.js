@@ -440,3 +440,150 @@ async function subirFoto(usuarioId) {
     }
     return null;
 }
+
+let vistaHistorial = 'compacta';
+
+function cambiarVistaHistorial(vista) {
+    vistaHistorial = vista;
+    document.getElementById('btn-hist-compacta').classList.toggle('activo', vista === 'compacta');
+    document.getElementById('btn-hist-completa').classList.toggle('activo', vista === 'completa');
+    renderCiclos();
+}
+
+function calcularSemaforoCiclo(sesiones) {
+    if (!sesiones || sesiones.length === 0) return '#94a3b8';
+    const cumplidos = sesiones.filter(s => s.cumplido).length;
+    const porcentaje = cumplidos / sesiones.length;
+    if (porcentaje >= 0.7) return '#22c55e';
+    if (porcentaje >= 0.4) return '#facc15';
+    return '#ef4444';
+}
+
+function renderCiclos() {
+    const divCiclos = document.getElementById('ficha-ciclos');
+
+    if (fichaData.ciclos.length === 0) {
+        divCiclos.innerHTML = `
+            <div style="text-align:center; padding:30px; color:#94a3b8;">
+                <div style="font-size:2rem; margin-bottom:8px;">📋</div>
+                <p style="font-size:0.85rem;">Sin ciclos registrados</p>
+            </div>
+        `;
+        return;
+    }
+
+    if (vistaHistorial === 'compacta') {
+        renderCiclosCompacta(divCiclos);
+    } else {
+        renderCiclosCompleta(divCiclos);
+    }
+}
+
+function renderCiclosCompacta(contenedor) {
+    contenedor.innerHTML = fichaData.ciclos.map((c, i) => {
+        const numCiclo = fichaData.ciclos.length - i;
+        const estadoColor = c.estado === 'activo' ? '#22c55e' : '#94a3b8';
+        const estadoLabel = c.estado === 'activo' ? '🟢 Activo' : '✅ Cerrado';
+        return `
+            <div class="ciclo-expandible">
+                <div class="ciclo-header" onclick="toggleCiclo(${c.id})">
+                    <div class="ciclo-header-izq">
+                        <span class="semaforo-dot" id="semaforo-ciclo-${c.id}" style="background:#94a3b8;"></span>
+                        <strong>Ciclo ${numCiclo}</strong>
+                        <span style="color:#94a3b8; font-size:0.8rem; margin-left:8px;">${c.fecha_inicio}</span>
+                    </div>
+                    <div class="ciclo-header-der">
+                        <span class="estado-badge" style="background:${estadoColor}20; color:${estadoColor}; font-size:0.75rem;">
+                            ${estadoLabel}
+                        </span>
+                        <span style="color:#64748b; font-size:0.82rem;">${c.numero_sesiones} sesiones</span>
+                        <span class="ciclo-flecha" id="flecha-ciclo-${c.id}">▶</span>
+                    </div>
+                </div>
+                <div class="ciclo-sesiones" id="sesiones-ciclo-${c.id}" style="display:none;"></div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function renderCiclosCompleta(contenedor) {
+    contenedor.innerHTML = `<p style="color:#94a3b8; text-align:center; padding:20px;">Cargando historial completo...</p>`;
+
+    let todasLasSesiones = [];
+
+    for (const ciclo of fichaData.ciclos) {
+        const res = await fetch(`${API}/ciclos/${ciclo.id}/sesiones`);
+        const sesiones = await res.json();
+        sesiones.forEach(s => {
+            todasLasSesiones.push({ ...s, ciclo_id: ciclo.id, ciclo_estado: ciclo.estado });
+        });
+    }
+
+    todasLasSesiones.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    if (todasLasSesiones.length === 0) {
+        contenedor.innerHTML = `<p style="color:#94a3b8; text-align:center; padding:20px;">Sin sesiones registradas</p>`;
+        return;
+    }
+
+    contenedor.innerHTML = todasLasSesiones.map(s => `
+        <div class="sesion-completa-item" onclick="abrirSesion(${s.id})">
+            <div class="sesion-completa-izq">
+                <span class="sesion-numero">${s.es_ingreso ? '⭐' : '📝'} Sesión ${s.numero_sesion}</span>
+                <span class="sesion-fecha">${s.fecha || '—'}</span>
+            </div>
+            <div class="sesion-completa-der">
+                <p class="sesion-actividades">${s.actividades || 'Sin registro'}</p>
+            </div>
+            <button class="btn-accion-mini" onclick="event.stopPropagation(); abrirSesion(${s.id})">
+                Ver/Editar
+            </button>
+        </div>
+    `).join('');
+}
+
+async function toggleCiclo(cicloId) {
+    const contenedor = document.getElementById(`sesiones-ciclo-${cicloId}`);
+    const flecha = document.getElementById(`flecha-ciclo-${cicloId}`);
+
+    if (contenedor.style.display === 'none') {
+        contenedor.style.display = 'block';
+        flecha.textContent = '▼';
+        contenedor.innerHTML = `<p style="color:#94a3b8; font-size:0.82rem; padding:10px;">Cargando sesiones...</p>`;
+
+        try {
+            const res = await fetch(`${API}/ciclos/${cicloId}/sesiones`);
+            const sesiones = await res.json();
+
+            const semaforo = document.getElementById(`semaforo-ciclo-${cicloId}`);
+            if (semaforo) semaforo.style.backgroundColor = calcularSemaforoCiclo(sesiones);
+
+            if (sesiones.length === 0) {
+                contenedor.innerHTML = `<p style="color:#94a3b8; font-size:0.82rem; padding:10px;">Sin sesiones registradas</p>`;
+                return;
+            }
+
+            contenedor.innerHTML = sesiones.map(s => `
+                <div class="sesion-item" onclick="abrirSesion(${s.id})" style="cursor:pointer;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span class="sesion-numero">${s.es_ingreso ? '⭐' : '📝'} Sesión ${s.numero_sesion}</span>
+                            <span class="sesion-fecha" style="margin-left:10px;">${s.fecha || '—'}</span>
+                        </div>
+                        <button class="btn-accion-mini" onclick="event.stopPropagation(); abrirSesion(${s.id})">Ver/Editar</button>
+                    </div>
+                    <p class="sesion-actividades">${s.actividades || 'Sin registro'}</p>
+                </div>
+            `).join('');
+        } catch (error) {
+            contenedor.innerHTML = `<p style="color:#dc2626; font-size:0.82rem; padding:10px;">Error cargando sesiones</p>`;
+        }
+    } else {
+        contenedor.style.display = 'none';
+        flecha.textContent = '▶';
+    }
+}
+
+function abrirSesion(sesionId) {
+    alert(`Ver/Editar sesión ${sesionId} - próximamente`);
+}

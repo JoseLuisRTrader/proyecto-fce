@@ -10,6 +10,7 @@ const ESTADOS = {
 
 const usuarioId = window.location.pathname.split('/').pop();
 let fichaData = null;
+let vistaHistorial = 'compacta';
 
 document.addEventListener('DOMContentLoaded', () => {
     inicializarInterfaz();
@@ -91,31 +92,177 @@ function renderFicha() {
         `).join('');
     }
 
-    // Ciclos
+    renderCiclos();
+}
+
+// ==========================================
+// HISTORIAL DE CICLOS
+// ==========================================
+
+function cambiarVistaHistorial(vista) {
+    vistaHistorial = vista;
+    document.getElementById('btn-hist-compacta').classList.toggle('activo', vista === 'compacta');
+    document.getElementById('btn-hist-completa').classList.toggle('activo', vista === 'completa');
+    renderCiclos();
+}
+
+function renderCiclos() {
     const divCiclos = document.getElementById('ficha-ciclos');
+
     if (fichaData.ciclos.length === 0) {
-        divCiclos.innerHTML = `<p style="color:#94a3b8; font-size:0.85rem;">Sin ciclos registrados</p>`;
-    } else {
-        divCiclos.innerHTML = fichaData.ciclos.map((c, i) => `
-            <div class="ciclo-item">
-                <div>
-                    <strong>Ciclo ${fichaData.ciclos.length - i}</strong>
-                    <span style="color:#64748b; margin-left:8px; font-size:0.8rem;">${c.fecha_inicio}</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="color:#64748b;">${c.numero_sesiones} sesiones</span>
-                    <span class="estado-badge" style="font-size:0.75rem; background:${c.estado === 'activo' ? '#dcfce7' : '#f1f5f9'}; color:${c.estado === 'activo' ? '#16a34a' : '#64748b'};">
-                        ${c.estado}
-                    </span>
-                </div>
+        divCiclos.innerHTML = `
+            <div style="text-align:center; padding:30px; color:#94a3b8;">
+                <div style="font-size:2rem; margin-bottom:8px;">📋</div>
+                <p style="font-size:0.85rem;">Sin ciclos registrados</p>
             </div>
-        `).join('');
+        `;
+        return;
+    }
+
+    if (vistaHistorial === 'compacta') {
+        renderCiclosCompacta(divCiclos);
+    } else {
+        renderCiclosCompleta(divCiclos);
     }
 }
 
-function abrirEditarFicha() {
-    window.location.href = `/usuarios/${usuarioId}/editar`;
+function renderCiclosCompacta(contenedor) {
+    contenedor.innerHTML = fichaData.ciclos.map((c, i) => {
+        const numCiclo = fichaData.ciclos.length - i;
+        const estadoColor = c.estado === 'activo' ? '#22c55e' : '#94a3b8';
+        const estadoLabel = c.estado === 'activo' ? '🟢 Activo' : '✅ Cerrado';
+        return `
+            <div class="ciclo-expandible">
+                <div class="ciclo-header" onclick="toggleCiclo(${c.id})">
+                    <div class="ciclo-header-izq">
+                        <span class="semaforo-dot" id="semaforo-ciclo-${c.id}" style="background:#94a3b8;"></span>
+                        <strong>Ciclo ${numCiclo}</strong>
+                        <span style="color:#94a3b8; font-size:0.8rem; margin-left:8px;">${c.fecha_inicio}</span>
+                    </div>
+                    <div class="ciclo-header-der">
+                        <span class="estado-badge" style="background:${estadoColor}20; color:${estadoColor}; font-size:0.75rem;">
+                            ${estadoLabel}
+                        </span>
+                        <span style="color:#64748b; font-size:0.82rem;">${c.numero_sesiones} sesiones</span>
+                        <span class="ciclo-flecha" id="flecha-ciclo-${c.id}">▶</span>
+                    </div>
+                </div>
+                <div class="ciclo-sesiones" id="sesiones-ciclo-${c.id}" style="display:none;"></div>
+            </div>
+        `;
+    }).join('');
 }
+
+async function renderCiclosCompleta(contenedor) {
+    contenedor.innerHTML = `<p style="color:#94a3b8; text-align:center; padding:20px;">Cargando historial completo...</p>`;
+
+    let todasLasSesiones = [];
+
+    for (const ciclo of fichaData.ciclos) {
+        const res = await fetch(`${API}/ciclos/${ciclo.id}/sesiones`);
+        const sesiones = await res.json();
+        const numCiclo = fichaData.ciclos.length - fichaData.ciclos.indexOf(ciclo);
+        sesiones.forEach(s => {
+            todasLasSesiones.push({ ...s, numCiclo });
+        });
+    }
+
+    todasLasSesiones.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    if (todasLasSesiones.length === 0) {
+        contenedor.innerHTML = `<p style="color:#94a3b8; text-align:center; padding:20px;">Sin sesiones registradas</p>`;
+        return;
+    }
+
+    const coloresCiclos = [
+        { bg: 'rgba(37,99,235,0.04)',   border: 'rgba(37,99,235,0.4)'   },  // azul
+        { bg: 'rgba(34,197,94,0.04)',   border: 'rgba(34,197,94,0.4)'   },  // verde
+        { bg: 'rgba(249,115,22,0.04)',  border: 'rgba(249,115,22,0.4)'  },  // naranja
+        { bg: 'rgba(168,85,247,0.04)',  border: 'rgba(168,85,247,0.4)'  },  // morado
+        { bg: 'rgba(234,179,8,0.04)',   border: 'rgba(234,179,8,0.4)'   },  // amarillo
+        { bg: 'rgba(236,72,153,0.04)',  border: 'rgba(236,72,153,0.4)'  },  // rosa
+    ];
+
+    contenedor.innerHTML = todasLasSesiones.map(s => {
+        const color = coloresCiclos[(s.numCiclo - 1) % coloresCiclos.length];
+        return `
+        <div class="sesion-completa-item"
+             style="background:${color.bg}; border-left: 3px solid ${color.border};"
+             onclick="abrirSesion(${s.id})">
+            <div class="sesion-completa-izq">
+                <span class="sesion-numero">${s.es_ingreso ? '⭐' : '📝'} Sesión ${s.numero_sesion}</span>
+                <span style="color:#94a3b8; font-size:0.75rem;">Ciclo ${s.numCiclo}</span>
+                <span class="sesion-fecha">${s.fecha || '—'}</span>
+            </div>
+            <div class="sesion-completa-der">
+                <p class="sesion-actividades">${s.actividades || 'Sin registro'}</p>
+            </div>
+            <button class="btn-accion-mini" onclick="event.stopPropagation(); abrirSesion(${s.id})">
+                Ver/Editar
+            </button>
+        </div>
+    `}).join('');
+}
+
+function calcularSemaforoCiclo(sesiones) {
+    if (!sesiones || sesiones.length === 0) return '#94a3b8';
+    const conActividades = sesiones.filter(s => s.actividades).length;
+    const porcentaje = conActividades / sesiones.length;
+    if (porcentaje >= 0.7) return '#22c55e';
+    if (porcentaje >= 0.4) return '#facc15';
+    return '#ef4444';
+}
+
+async function toggleCiclo(cicloId) {
+    const contenedor = document.getElementById(`sesiones-ciclo-${cicloId}`);
+    const flecha = document.getElementById(`flecha-ciclo-${cicloId}`);
+
+    if (contenedor.style.display === 'none') {
+        contenedor.style.display = 'block';
+        flecha.textContent = '▼';
+        contenedor.innerHTML = `<p style="color:#94a3b8; font-size:0.82rem; padding:10px;">Cargando sesiones...</p>`;
+
+        try {
+            const res = await fetch(`${API}/ciclos/${cicloId}/sesiones`);
+            const sesiones = await res.json();
+            sesiones.reverse();
+
+            const semaforo = document.getElementById(`semaforo-ciclo-${cicloId}`);
+            if (semaforo) semaforo.style.backgroundColor = calcularSemaforoCiclo(sesiones);
+
+            if (sesiones.length === 0) {
+                contenedor.innerHTML = `<p style="color:#94a3b8; font-size:0.82rem; padding:10px;">Sin sesiones registradas</p>`;
+                return;
+            }
+
+            contenedor.innerHTML = sesiones.map(s => `
+                <div class="sesion-item" style="cursor:pointer;" onclick="abrirSesion(${s.id})">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span class="sesion-numero">${s.es_ingreso ? '⭐' : '📝'} Sesión ${s.numero_sesion}</span>
+                            <span class="sesion-fecha" style="margin-left:10px;">${s.fecha || '—'}</span>
+                        </div>
+                        <button class="btn-accion-mini" onclick="event.stopPropagation(); abrirSesion(${s.id})">Ver/Editar</button>
+                    </div>
+                    <p class="sesion-actividades">${s.actividades || 'Sin registro de actividades'}</p>
+                </div>
+            `).join('');
+        } catch (error) {
+            contenedor.innerHTML = `<p style="color:#dc2626; font-size:0.82rem; padding:10px;">Error cargando sesiones</p>`;
+        }
+    } else {
+        contenedor.style.display = 'none';
+        flecha.textContent = '▶';
+    }
+}
+
+function abrirSesion(sesionId) {
+    alert(`Ver/Editar sesión ${sesionId} - próximamente`);
+}
+
+// ==========================================
+// CAMBIAR ESTADO
+// ==========================================
 
 function abrirCambiarEstadoFicha(event) {
     event.stopPropagation();
@@ -163,7 +310,9 @@ function cerrarSesion() {
     window.location.href = "/";
 }
 
-// --- MODAL EDITAR FICHA ---
+// ==========================================
+// MODAL EDITAR FICHA
+// ==========================================
 
 function cambiarTabFicha(tab) {
     document.querySelectorAll('#modal-editar-ficha .tab-content').forEach(t => t.classList.remove('active'));
@@ -379,4 +528,168 @@ async function fEliminarMedicamento(id) {
     await fetch(`${API}/medicamentos/${id}`, { method: 'DELETE' });
     await fCargarMedicamentos();
     await cargarFicha();
+}
+
+// ==========================================
+// MODAL SESIÓN
+// ==========================================
+
+let sesionActivaId = null;
+let sesionData = null;
+
+function cambiarTabSesion(tab) {
+    document.querySelectorAll('#modal-sesion .tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('#modal-sesion .tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`stab-${tab}`).classList.add('active');
+    event.target.classList.add('active');
+}
+
+async function abrirSesion(sesionId) {
+    sesionActivaId = sesionId;
+
+    if (!fichaData) {
+        await cargarFicha();
+    }
+
+    try {
+        const res = await fetch(`${API}/sesiones/${sesionId}/detalle`);
+        if (!res.ok) throw new Error("Error cargando sesión");
+        sesionData = await res.json();
+
+        const numeroCiclo = fichaData.ciclos.length - fichaData.ciclos.findIndex(c => c.id === sesionData.ciclo_id);
+        sesionData.ciclo_numero = numeroCiclo;
+
+        document.getElementById('sesion-modal-titulo').innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span>${sesionData.es_ingreso ? '⭐' : '📝'}</span>
+                    <span>Sesión ${sesionData.numero_sesion}</span>
+                    <span class="estado-badge" style="background:#dbeafe; color:#2563eb; font-size:0.75rem;">
+                        Ciclo ${sesionData.ciclo_numero}
+                    </span>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <span class="tag">👤 ${fichaData.nombre}</span>
+                    <span class="tag">🎂 ${fichaData.edad} años</span>
+                    <span class="tag">🪪 ${fichaData.rut}</span>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('sesion-fecha').value = sesionData.fecha || '';
+        document.getElementById('sesion-actividades').value = sesionData.actividades || '';
+        document.getElementById('sesion-materiales').value = sesionData.materiales || '';
+        document.getElementById('sesion-compromisos').value = sesionData.compromisos || '';
+
+        renderIndicadoresSesion(sesionData.indicadores);
+
+        document.getElementById('modal-sesion').style.display = 'flex';
+
+    } catch (error) {
+        console.error("Error abriendo sesión:", error);
+        alert("No se pudo cargar la sesión");
+    }
+}
+
+
+function renderIndicadoresSesion(indicadores) {
+    const lista = document.getElementById('sesion-indicadores-lista');
+
+    if (!indicadores || indicadores.length === 0) {
+        lista.innerHTML = `
+            <div style="text-align:center; padding:30px; color:#94a3b8;">
+                <p style="font-size:0.9rem;">No hay indicadores definidos para este ciclo.</p>
+                <p style="font-size:0.82rem; margin-top:8px;">Agrega objetivos e indicadores desde la sección de ciclos.</p>
+            </div>
+        `;
+        return;
+    }
+
+    lista.innerHTML = indicadores.map(ind => `
+        <div class="indicador-eval-item" id="ind-item-${ind.id}">
+            <div class="indicador-eval-header">
+                <span class="indicador-eval-desc">${ind.descripcion}</span>
+                <div class="indicador-eval-btns">
+                    <button class="btn-ind ${ind.cumplido === true ? 'activo-verde' : ''}" 
+                            onclick="setIndicador(${ind.id}, true)">✅ Cumplido</button>
+                    <button class="btn-ind ${ind.cumplido === false ? 'activo-rojo' : ''}"
+                            onclick="setIndicador(${ind.id}, false)">⭕ No cumplido</button>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:8px;">
+                <input type="text" id="obs-${ind.id}" 
+                       value="${ind.observacion || ''}"
+                       placeholder="Observación (opcional)"
+                       style="width:100%; padding:8px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:0.85rem;">
+            </div>
+        </div>
+    `).join('');
+}
+
+function setIndicador(indicadorId, cumplido) {
+    const ind = sesionData.indicadores.find(i => i.id === indicadorId);
+    if (ind) ind.cumplido = cumplido;
+
+    const item = document.getElementById(`ind-item-${indicadorId}`);
+    item.querySelectorAll('.btn-ind').forEach(b => {
+        b.classList.remove('activo-verde', 'activo-rojo');
+    });
+    const btns = item.querySelectorAll('.btn-ind');
+    btns[0].classList.toggle('activo-verde', cumplido === true);
+    btns[1].classList.toggle('activo-rojo', cumplido === false);
+}
+
+async function guardarSesion() {
+    const datos = {
+        fecha: document.getElementById('sesion-fecha').value || null,
+        actividades: document.getElementById('sesion-actividades').value || null,
+        materiales: document.getElementById('sesion-materiales').value || null,
+        compromisos: document.getElementById('sesion-compromisos').value || null
+    };
+
+    const res = await fetch(`${API}/sesiones/${sesionActivaId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos)
+    });
+
+    if (res.ok) {
+        alert("✅ Registro guardado correctamente");
+        cerrarModalSesion();
+        await cargarFicha();
+    } else {
+        alert("Error al guardar el registro");
+    }
+}
+
+async function guardarEvaluaciones() {
+    const evaluaciones = sesionData.indicadores.map(ind => ({
+        indicador_id: ind.id,
+        evaluacion_id: ind.evaluacion_id,
+        cumplido: ind.cumplido,
+        observacion: document.getElementById(`obs-${ind.id}`)?.value || null
+    }));
+
+    const res = await fetch(`${API}/indicadores/evaluaciones/guardar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sesion_id: sesionActivaId,
+            evaluaciones
+        })
+    });
+
+    if (res.ok) {
+        alert("✅ Evaluaciones guardadas correctamente");
+        cerrarModalSesion();
+        await cargarFicha();
+    } else {
+        alert("Error al guardar evaluaciones");
+    }
+}
+
+function cerrarModalSesion() {
+    document.getElementById('modal-sesion').style.display = 'none';
+    sesionActivaId = null;
+    sesionData = null;
 }

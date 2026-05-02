@@ -1,3 +1,4 @@
+import models
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
@@ -53,3 +54,28 @@ def eliminar_indicador(indicador_id: int, db: Session = Depends(get_db)):
     db.delete(indicador)
     db.commit()
     return {"mensaje": "Indicador eliminado"}
+
+@router.post("/evaluaciones/guardar")
+async def guardar_evaluaciones(datos: dict, db: Session = Depends(get_db)):
+    sesion_id = datos.get("sesion_id")
+    evaluaciones = datos.get("evaluaciones", [])
+    
+    for e in evaluaciones:
+        if e.get("evaluacion_id"):
+            eval_obj = db.query(models.EvaluacionIndicador).filter(
+                models.EvaluacionIndicador.id == e["evaluacion_id"]
+            ).first()
+            if eval_obj:
+                eval_obj.cumplido = e["cumplido"]
+                eval_obj.observacion = e.get("observacion")
+        else:
+            nueva = models.EvaluacionIndicador(
+                sesion_id=sesion_id,
+                indicador_id=e["indicador_id"],
+                cumplido=e["cumplido"],
+                observacion=e.get("observacion")
+            )
+            db.add(nueva)
+    
+    db.commit()
+    return {"mensaje": "Evaluaciones guardadas"}

@@ -4,7 +4,7 @@ from database import SessionLocal, get_db
 import models, schemas
 
 router = APIRouter(
-    prefix="/Bloques_horario",
+    prefix="/bloques_horario",
     tags=["Bloques_horario"]
 )
 

@@ -228,3 +228,10 @@ class MedicamentoRespuesta(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SesionActualizar(BaseModel):
+    fecha: Optional[date] = None
+    actividades: Optional[str] = None
+    materiales: Optional[str] = None
+    compromisos: Optional[str] = None
