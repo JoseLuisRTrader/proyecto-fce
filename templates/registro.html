@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCE - Registro</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=2.0">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-layout">
+        {% include '_menu.html' %}
+        <main class="content-area">
+            <!-- ESTADÍSTICAS -->
+            <section class="dashboard-grid" style="margin-bottom:30px;">
+                <div class="card">
+                    <h3>Sesiones este mes</h3>
+                    <p id="stat-sesiones-mes">0</p>
+                </div>
+                <div class="card">
+                    <h3>Registradas</h3>
+                    <p id="stat-registradas">0</p>
+                </div>
+                <div class="card" style="border-left: 3px solid #f97316;">
+                    <h3>Pendientes</h3>
+                    <p id="stat-pendientes" style="color:#f97316;">0</p>
+                </div>
+            </section>
+            <!-- SESIONES DE HOY -->
+            <section class="table-section" style="margin-bottom:30px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h2 style="color:#374151;">📅 Sesiones de Hoy</h2>
+                    <span id="badge-hoy" class="dia-badge"></span>
+                </div>
+                <div id="lista-sesiones-hoy" class="tabla-container"></div>
+            </section>
+            <!-- PENDIENTES -->
+            <section class="table-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h2 style="color:#374151;">⚠️ Registros Pendientes</h2>
+                    <span id="badge-pendientes" class="dia-badge" style="background:#fff7ed; color:#ea580c;"></span>
+                </div>
+                <div id="lista-pendientes" class="tabla-container"></div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL ATENCIÓN -->
+    <!-- MODAL EDITAR USUARIO -->
+    {% include 'partials/_modal_atencion.html' %}
+    {% include 'partials/_modal_editar_ficha.html' %}
+
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/registro.js?v=1.0"></script>
+</body>
+</html>

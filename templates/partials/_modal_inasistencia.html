@@ -1,0 +1,19 @@
+<div id="modal-inasistencia" class="modal-overlay">
+    <div class="modal-content" style="max-width: 450px; width: 95%;">
+        <div class="modal-header">
+            <h2>❌ Inasistencia</h2>
+            <button class="btn-close" onclick="cerrarModalInasistencia()">&times;</button>
+        </div>
+        <div style="padding: 20px;">
+            <p style="color:#64748b; margin-bottom:20px;">¿Qué deseas hacer con este registro de inasistencia?</p>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button class="btn-primary" onclick="convertirEnSesion()">
+                    📝 Convertir en sesión registrada
+                </button>
+                <button class="btn-secondary" style="background:#fff1f2; border-color:#fecdd3; color:#e11d48;" onclick="eliminarInasistencia()">
+                    🗑️ Eliminar inasistencia
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

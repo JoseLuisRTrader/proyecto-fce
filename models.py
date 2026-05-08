@@ -96,6 +96,7 @@ class Sesion(Base):
     materiales = Column(Text)
     compromisos = Column(Text)
     es_ingreso = Column(Boolean, default=False)
+    es_inasistencia = Column(Boolean, default=False)
 
     ciclo = relationship("Ciclo", back_populates="sesiones")
     reserva = relationship("Reserva", back_populates="sesion")

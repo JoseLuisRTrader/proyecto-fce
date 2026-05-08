@@ -1,0 +1,33 @@
+<!-- ================================================
+     MENÚ LATERAL Y BARRA SUPERIOR - COMPONENTE COMPARTIDO
+     ================================================ -->
+
+<nav class="sidebar">
+    <div class="sidebar-header">
+        <h2>FCE Project</h2>
+    </div>
+    <ul class="sidebar-menu">
+        <li><a href="/dashboard" {% if active == 'dashboard' %}class="active"{% endif %}>📊 Resumen</a></li>
+        <li><a href="/registro" {% if active == 'registro' %}class="active"{% endif %}>📝 Registro</a></li>
+        <li><a href="/usuarios" {% if active == 'usuarios' %}class="active"{% endif %}>👥 Usuarios</a></li>
+        <li><a href="#" onclick="alert('Próximamente...')">📅 Agenda</a></li>
+        <li><a href="#" onclick="alert('Próximamente...')">💰 Finanzas</a></li>
+    </ul>
+    <div class="sidebar-footer">
+        <a href="#" class="btn-config">⚙️ Configuración</a>
+        <button onclick="cerrarSesion()" class="btn-logout">Cerrar Sesión</button>
+    </div>
+</nav>
+
+<div class="main-wrapper">
+    <header class="top-bar">
+        <div class="top-bar-left">
+            <span id="fecha-completa" class="full-date"></span>
+        </div>
+        <div class="top-bar-right">
+            <div class="profile-display">
+                <span id="nombre-profesional-top">Cargando...</span>
+                <img src="" class="avatar-small" id="user-photo-top" alt="Perfil">
+            </div>
+        </div>
+    </header>

@@ -728,6 +728,16 @@ input:focus {
     cursor: pointer;
     transition: background 0.2s;
 }
+.btn-inasistencia {
+    background-color: #dedede;
+    color: rgb(0, 0, 0);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: 0.3s;
+}
 
 .btn-secondary:hover {
     background: #e2e8f0;
@@ -1527,4 +1537,9 @@ input:focus {
 
 .btn-registrado:hover {
     background: #bbf7d0;
+}
+.sesion-inasistencia {
+    background: #fff1f2;
+    border: 1px solid #fecdd3;
+    opacity: 0.85;
 }

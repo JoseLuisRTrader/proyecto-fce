@@ -1,18 +1,21 @@
 import os
 import shutil
 
-from database import get_db, engine
-from fastapi import FastAPI, Depends, HTTPException, File, UploadFile
+from database import get_db
+from fastapi import FastAPI, Depends, HTTPException, File, UploadFile, Request
 from sqlalchemy.orm import Session
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from routers import usuarios, profesionales, bloques_horario, reservas, ciclos, sesiones, objetivos, indicadores, informes, dashboard, finanzas, diagnosticos, medicamentos, ciclos, anamnesis
-
+from fastapi.templating import Jinja2Templates
+from routers import (usuarios, profesionales, bloques_horario, reservas, 
+                     ciclos, sesiones, objetivos, indicadores, informes, 
+                     dashboard, finanzas, diagnosticos, medicamentos, anamnesis)
 
 app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Routers
 app.include_router(usuarios.router)
 app.include_router(profesionales.router)
 app.include_router(bloques_horario.router)
@@ -26,21 +29,30 @@ app.include_router(dashboard.router)
 app.include_router(finanzas.router)
 app.include_router(diagnosticos.router)
 app.include_router(medicamentos.router)
-app.include_router(ciclos.router)
 app.include_router(anamnesis.router)
 
+# Páginas
 @app.get("/")
-def inicio():
-    return FileResponse("templates/login.html")
+def inicio(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
 
 @app.get("/dashboard")
-def dashboard():
-    return FileResponse("templates/dashboard.html")
+def pagina_dashboard(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request, "active": "dashboard"})
 
 @app.get("/usuarios")
-def pagina_usuarios():
-    return FileResponse("templates/usuarios.html")
+def pagina_usuarios(request: Request):
+    return templates.TemplateResponse("usuarios.html", {"request": request, "active": "usuarios"})
 
+@app.get("/registro")
+def pagina_registro(request: Request):
+    return templates.TemplateResponse("registro.html", {"request": request, "active": "registro"})
+
+@app.get("/ficha/{usuario_id}")
+def pagina_ficha_usuario(usuario_id: int, request: Request):
+    return templates.TemplateResponse("ficha_usuario.html", {"request": request, "active": "usuarios"})
+
+# Subir foto de usuario
 @app.post("/usuarios/{usuario_id}/foto")
 async def subir_foto(usuario_id: int, foto: UploadFile = File(...), db: Session = Depends(get_db)):
     from models import Usuario
@@ -61,7 +73,3 @@ async def subir_foto(usuario_id: int, foto: UploadFile = File(...), db: Session 
     db.commit()
     
     return {"foto_url": foto_url}
-
-@app.get("/ficha/{usuario_id}")
-def pagina_ficha_usuario(usuario_id: int):
-    return FileResponse("templates/ficha_usuario.html")

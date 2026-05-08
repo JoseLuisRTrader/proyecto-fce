@@ -69,6 +69,7 @@ def obtener_sesiones_ciclo(ciclo_id: int, db: Session = Depends(get_db)):
             "numero_sesion": s.numero_sesion,
             "fecha": str(s.fecha) if s.fecha else None,
             "actividades": s.actividades,
-            "es_ingreso": s.es_ingreso
+            "es_ingreso": s.es_ingreso,
+            "es_inasistencia": s.es_inasistencia or False
         } for s in sesiones
     ]

@@ -116,3 +116,120 @@ def obtener_proximos_dias(db: Session = Depends(get_db)):
     })
 
     return resultado
+
+@router.get("/pendientes")
+def obtener_pendientes(db: Session = Depends(get_db)):
+    hoy = date.today()
+    
+    # Reservas pasadas sin sesión registrada o con sesión sin actividades
+    pendientes = db.query(models.Reserva).join(models.BloqueHorario).filter(
+        models.BloqueHorario.fecha < hoy,
+        models.Reserva.estado == "confirmada"
+    ).count()
+
+    return {"total": pendientes}
+
+@router.get("/sesiones-pendientes")
+def obtener_sesiones_pendientes(db: Session = Depends(get_db)):
+    hoy = date.today()
+    
+    reservas_sin_registro = db.query(
+        models.Reserva.id.label("reserva_id"),
+        models.Usuario.id.label("usuario_id"),
+        models.Usuario.nombre,
+        models.Usuario.rut,
+        models.Usuario.foto_url,
+        models.BloqueHorario.fecha,
+        models.BloqueHorario.hora_inicio.label("hora")
+    ).join(models.BloqueHorario, models.Reserva.bloque_horario_id == models.BloqueHorario.id)\
+     .join(models.Usuario, models.Reserva.usuario_id == models.Usuario.id)\
+     .outerjoin(models.Sesion, models.Sesion.reserva_id == models.Reserva.id)\
+     .filter(
+        models.BloqueHorario.fecha <= hoy,
+        models.Reserva.estado == "confirmada"
+     ).filter(
+        (models.Sesion.id == None) | (models.Sesion.actividades == None)
+     ).order_by(models.BloqueHorario.fecha.asc())\
+     .all()
+
+    dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
+    return [
+        {
+            "reserva_id": r.reserva_id,
+            "usuario_id": r.usuario_id,
+            "nombre": r.nombre,
+            "rut": r.rut,
+            "foto_url": r.foto_url or f"https://ui-avatars.com/api/?name={r.nombre.replace(' ', '+')}&background=2563eb&color=fff",
+            "fecha": str(r.fecha),
+            "fecha_label": f"{dias_semana[r.fecha.weekday()]} {r.fecha.day} de {meses[r.fecha.month - 1]}",
+            "hora": r.hora,
+            "es_hoy": r.fecha == hoy  # ← este campo separa hoy de anteriores
+        }
+        for r in reservas_sin_registro
+    ]
+
+    # Reservas pasadas sin sesión registrada o con sesión sin actividades
+    reservas_sin_registro = db.query(
+        models.Reserva.id.label("reserva_id"),
+        models.Usuario.id.label("usuario_id"),
+        models.Usuario.nombre,
+        models.Usuario.rut,
+        models.Usuario.foto_url,
+        models.BloqueHorario.fecha,
+        models.BloqueHorario.hora_inicio.label("hora")
+    ).join(models.BloqueHorario, models.Reserva.bloque_horario_id == models.BloqueHorario.id)\
+     .join(models.Usuario, models.Reserva.usuario_id == models.Usuario.id)\
+     .outerjoin(models.Sesion, models.Sesion.reserva_id == models.Reserva.id)\
+     .filter(
+        models.BloqueHorario.fecha <= hoy,
+        models.Reserva.estado == "confirmada"
+     ).filter(
+        (models.Sesion.id == None) | (models.Sesion.actividades == None)
+     ).order_by(models.BloqueHorario.fecha.asc())\
+     .all()
+
+    dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", 
+             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
+    return [
+        {
+            "reserva_id": r.reserva_id,
+            "usuario_id": r.usuario_id,
+            "nombre": r.nombre,
+            "rut": r.rut,
+            "foto_url": r.foto_url or f"https://ui-avatars.com/api/?name={r.nombre.replace(' ', '+')}&background=2563eb&color=fff",
+            "fecha": str(r.fecha),
+            "fecha_label": f"{dias_semana[r.fecha.weekday()]} {r.fecha.day} de {meses[r.fecha.month - 1]}",
+            "hora": r.hora,
+            "es_hoy": r.fecha == hoy
+        }
+        for r in reservas_sin_registro
+    ]
+
+@router.get("/estadisticas-registro")
+def obtener_estadisticas_registro(db: Session = Depends(get_db)):
+    from datetime import date
+    hoy = date.today()
+    primer_dia_mes = hoy.replace(day=1)
+    
+    total_mes = db.query(models.BloqueHorario).filter(
+        models.BloqueHorario.fecha >= primer_dia_mes,
+        models.BloqueHorario.fecha <= hoy,
+        models.BloqueHorario.disponible == False
+    ).count()
+    
+    registradas = db.query(models.Sesion).join(models.Reserva).join(models.BloqueHorario).filter(
+        models.BloqueHorario.fecha >= primer_dia_mes,
+        models.BloqueHorario.fecha <= hoy,
+        models.Sesion.actividades != None
+    ).count()
+    
+    return {
+        "total_mes": total_mes,
+        "registradas": registradas,
+        "pendientes": total_mes - registradas
+    }

@@ -1,36 +1,13 @@
-const API = "http://127.0.0.1:8000";
 let todosLosUsuarios = [];
 let diagnosticosNuevos = [];
 let medicamentosNuevos = [];
 let vistaActual = 'tabla';
 let dropdownAbierto = false;
 
-const ESTADOS = {
-    "en_tto":       { label: "En tratamiento", color: "#22c55e" },
-    "alta":         { label: "Alta",            color: "#3b82f6" },
-    "pausa":        { label: "Pausa",           color: "#facc15" },
-    "lista_espera": { label: "Lista de espera", color: "#f97316" },
-    "derivado":     { label: "Derivado",        color: "#94a3b8" }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     inicializarInterfaz();
     cargarUsuarios();
 });     
-
-function inicializarInterfaz() {
-    const nombre = localStorage.getItem('nombre_profesional');
-    if (!nombre) { window.location.href = "/"; return; }
-    const nombreEl = document.getElementById('nombre-profesional-top');
-    const fotoEl = document.getElementById('user-photo-top');
-    if (nombreEl) nombreEl.innerText = nombre;
-    if (fotoEl) fotoEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(nombre)}&background=2563eb&color=fff`;
-    const fechaEl = document.getElementById('fecha-completa');
-    if (fechaEl) {
-        const opciones = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-        fechaEl.innerText = new Date().toLocaleDateString('es-CL', opciones);
-    }
-}
 
 async function cargarUsuarios() {
     try {
@@ -193,8 +170,31 @@ function verUsuario(id) {
     window.location.href = `/ficha/${id}`;
 }
 
-function editarUsuario(id) {
-    alert(`Editar usuario ${id} - próximamente`);
+async function editarUsuario(id) {
+    usuarioActivoId = id;
+    
+    try {
+        const res = await fetch(`${API}/usuarios/${id}`);
+        const u = await res.json();
+        
+        document.getElementById('edit-nombre').value = u.nombre || '';
+        document.getElementById('edit-rut').value = u.rut || '';
+        document.getElementById('edit-fecha-nacimiento').value = u.fecha_nacimiento || '';
+        document.getElementById('edit-telefono1').value = u.telefono_1 || '';
+        document.getElementById('edit-telefono2').value = u.telefono_2 || '';
+        document.getElementById('edit-email').value = u.email || '';
+        document.getElementById('edit-tutor').value = u.nombre_tutor || '';
+        document.getElementById('edit-establecimiento').value = u.establecimiento_educacional || '';
+        document.getElementById('edit-tarifa').value = u.tarifa_pactada || '';
+
+        await cargarDiagnosticos();
+        await cargarMedicamentos();
+
+        document.getElementById('modal-editar-usuario').style.display = 'flex';
+    } catch (error) {
+        console.error("Error cargando usuario:", error);
+        alert("No se pudo cargar el usuario");
+    }
 }
 
 // DROPDOWN ESTADO
@@ -254,10 +254,6 @@ async function confirmarCambioEstado(id, nuevoEstado) {
     await cargarUsuarios();
 }
 
-function cerrarSesion() {
-    localStorage.clear();
-    window.location.href = "/";
-}
 
 // MODAL NUEVO USUARIO
 function abrirModalUsuario() {
@@ -275,11 +271,6 @@ function cerrarModalUsuario() {
     document.getElementById('lista-diagnosticos-nuevo').innerHTML = '';
     document.getElementById('lista-medicamentos-nuevo').innerHTML = '';
     document.getElementById('usuario-mensaje-error').textContent = '';
-}
-
-function toggleSeccion(id) {
-    const seccion = document.getElementById(id);
-    seccion.style.display = seccion.style.display === 'none' ? 'block' : 'none';
 }
 
 function agregarDiagnosticoNuevo() {
@@ -398,16 +389,6 @@ async function guardarUsuario() {
         error.textContent = "Error de conexión";
     }
 }
-
-function calcularEdad(fechaNacimiento) {
-    if (!fechaNacimiento) return '—';
-    const hoy = new Date();
-    const nac = new Date(fechaNacimiento);
-    let edad = hoy.getFullYear() - nac.getFullYear();
-    const mes = hoy.getMonth() - nac.getMonth();
-    if (mes < 0 || (mes === 0 && hoy.getDate() < nac.getDate())) edad--;
-    return edad;
-}     
 
 let archivoFotoSeleccionado = null;
 

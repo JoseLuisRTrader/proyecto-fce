@@ -237,6 +237,7 @@ class SesionActualizar(BaseModel):
     actividades: Optional[str] = None
     materiales: Optional[str] = None
     compromisos: Optional[str] = None
+    es_inasistencia: Optional[bool] = None
 
 class AnamnesisCrear(BaseModel):
     ciclo_id: int

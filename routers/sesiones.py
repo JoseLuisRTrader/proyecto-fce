@@ -9,8 +9,6 @@ router = APIRouter(
     tags=["Sesiones"]
 )
 
-
-
 @router.post("/sesiones", response_model=schemas.SesionRespuesta)
 def crear_sesion(sesion: schemas.SesionCrear, db: Session = Depends(get_db)):
     ciclo = db.query(models.Ciclo).filter(models.Ciclo.id==sesion.ciclo_id).first()
@@ -176,8 +174,27 @@ def actualizar_sesion(sesion_id: int, datos: schemas.SesionActualizar, db: Sessi
     sesion = db.query(models.Sesion).filter(models.Sesion.id == sesion_id).first()
     if not sesion:
         raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    
+    # Si se convierte de inasistencia a sesión normal
+    if datos.es_inasistencia == False and sesion.es_inasistencia == True:
+        ciclo = db.query(models.Ciclo).filter(
+            models.Ciclo.id == sesion.ciclo_id
+        ).first()
+        if ciclo:
+            ciclo.numero_sesiones += 1
+            sesion.numero_sesion = ciclo.numero_sesiones
+        
+        # Restaurar reserva a asistio
+        if sesion.reserva_id:
+            reserva = db.query(models.Reserva).filter(
+                models.Reserva.id == sesion.reserva_id
+            ).first()
+            if reserva:
+                reserva.estado = "asistio"
+
     for campo, valor in datos.dict(exclude_unset=True).items():
         setattr(sesion, campo, valor)
+    
     db.commit()
     db.refresh(sesion)
     return {"mensaje": "Sesión actualizada"}
@@ -228,3 +245,136 @@ def obtener_sesion_por_reserva(reserva_id: int, db: Session = Depends(get_db)):
         "compromisos": sesion.compromisos,
         "fecha": str(sesion.fecha) if sesion.fecha else None
     }
+
+@router.post("/registrar-inasistencia")
+def registrar_inasistencia(datos: dict, db: Session = Depends(get_db)):
+
+    reserva_id = datos.get("reserva_id")
+    usuario_id = datos.get("usuario_id")
+    
+    reserva = db.query(models.Reserva).filter(
+        models.Reserva.id == reserva_id
+    ).first()
+    if not reserva:
+        raise HTTPException(status_code=404, detail="Reserva no encontrada")
+    
+    reserva.estado = "nsp"
+
+    # Buscar o crear ciclo activo
+    ciclo = db.query(models.Ciclo).filter(
+        models.Ciclo.usuario_id == usuario_id,
+        models.Ciclo.estado == "activo"
+    ).first()
+
+    # Si no tiene ciclo, crear uno
+    if not ciclo:
+        ciclo = models.Ciclo(
+            usuario_id=usuario_id,
+            profesional_id=1,
+            fecha_inicio=date.today(),
+            numero_sesiones=0,
+            estado="activo"
+        )
+        db.add(ciclo)
+        db.flush()
+
+    # Verificar que no exista ya una sesión para esta reserva
+    sesion_existente = db.query(models.Sesion).filter(
+        models.Sesion.reserva_id == reserva_id
+    ).first()
+
+    if not sesion_existente:
+        sesion = models.Sesion(
+            ciclo_id=ciclo.id,
+            reserva_id=reserva_id,
+            fecha=date.today(),
+            numero_sesion=None,  # No cuenta como sesión del ciclo
+            actividades="Inasistencia",
+            es_ingreso=False,
+            es_inasistencia=True  # ← marca especial
+        )
+        db.add(sesion)
+        # NO incrementar ciclo.numero_sesiones
+
+    db.commit()
+    return {"status": "success", "mensaje": "Inasistencia registrada"}
+    reserva_id = datos.get("reserva_id")
+    usuario_id = datos.get("usuario_id")
+    
+    reserva = db.query(models.Reserva).filter(
+        models.Reserva.id == reserva_id
+    ).first()
+    
+    if not reserva:
+        raise HTTPException(status_code=404, detail="Reserva no encontrada")
+    
+    # Marcar reserva como inasistencia
+    reserva.estado = "nsp"
+
+    # Buscar ciclo activo del usuario
+    ciclo = db.query(models.Ciclo).filter(
+        models.Ciclo.usuario_id == usuario_id,
+        models.Ciclo.estado == "activo"
+    ).first()
+
+    if ciclo:
+        # Verificar si ya existe sesión para esta reserva
+        sesion_existente = db.query(models.Sesion).filter(
+            models.Sesion.reserva_id == reserva_id
+        ).first()
+
+        if not sesion_existente:
+            # Crear sesión de inasistencia
+            sesion = models.Sesion(
+                ciclo_id=ciclo.id,
+                reserva_id=reserva_id,
+                fecha=date.today(),
+                numero_sesion=ciclo.numero_sesiones + 1,
+                actividades="⚠️ Inasistencia - Usuario no se presentó (NSP)",
+                es_ingreso=False
+            )
+            db.add(sesion)
+            # No suma al contador de sesiones clínicas
+    
+    db.commit()
+    return {"status": "success", "mensaje": "Inasistencia registrada"}
+    reserva_id = datos.get("reserva_id")
+    
+    # Marcar reserva como inasistencia
+    reserva = db.query(models.Reserva).filter(
+        models.Reserva.id == reserva_id
+    ).first()
+    
+    if not reserva:
+        raise HTTPException(status_code=404, detail="Reserva no encontrada")
+    
+    reserva.estado = "nsp"  # No Se Presentó
+    db.commit()
+    
+    return {"status": "success", "mensaje": "Inasistencia registrada"}
+
+@router.delete("/{sesion_id}")
+def eliminar_sesion(sesion_id: int, db: Session = Depends(get_db)):
+    sesion = db.query(models.Sesion).filter(models.Sesion.id == sesion_id).first()
+    if not sesion:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    
+    # Si era inasistencia, restaurar reserva a confirmada
+    if sesion.es_inasistencia and sesion.reserva_id:
+        reserva = db.query(models.Reserva).filter(
+            models.Reserva.id == sesion.reserva_id
+        ).first()
+        if reserva:
+            reserva.estado = "confirmada"
+    
+    # Si tenía número de sesión, decrementar ciclo
+    if not sesion.es_inasistencia and sesion.ciclo_id:
+        ciclo = db.query(models.Ciclo).filter(
+            models.Ciclo.id == sesion.ciclo_id
+        ).first()
+        if ciclo and ciclo.numero_sesiones > 0:
+            ciclo.numero_sesiones -= 1
+    
+    db.delete(sesion)
+    db.commit()
+    return {"mensaje": "Sesión eliminada"}
