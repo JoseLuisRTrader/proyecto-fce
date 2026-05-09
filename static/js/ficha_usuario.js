@@ -205,6 +205,7 @@ async function toggleCiclo(cicloId) {
     const flecha = document.getElementById(`flecha-ciclo-${cicloId}`);
 
     if (contenedor.style.display === 'none') {
+        window._cicloAbierto = cicloId;  //guardar el cilo abierto para recargarlo después de guardar un ingreso
         contenedor.style.display = 'block';
         flecha.textContent = '▼';
         contenedor.innerHTML = `<p style="color:#94a3b8; font-size:0.82rem; padding:10px;">Cargando sesiones...</p>`;
@@ -258,6 +259,7 @@ async function toggleCiclo(cicloId) {
             contenedor.innerHTML = `<p style="color:#dc2626; font-size:0.82rem; padding:10px;">Error cargando sesiones</p>`;
         }
     } else {
+        window._cicloAbierto = null;
         contenedor.style.display = 'none';
         flecha.textContent = '▶';
     }
@@ -423,10 +425,24 @@ async function abrirModalIngreso() {
     document.getElementById('ing-materiales').value = sesionData.materiales || '';
     document.getElementById('ing-compromisos').value = sesionData.compromisos || '';
 
-    // Cargar objetivos del ciclo
-    await cargarObjetivosIngreso();
+    // Setear cicloId en el modal
+    const modal = document.getElementById('modal-ingreso');
+    modal.dataset.cicloId = sesionData.ciclo_id;
+    modal.dataset.reservaId = sesionData.reserva_id || '';
 
-    document.getElementById('modal-ingreso').style.display = 'flex';
+    // Cargar objetivos, diagnósticos y medicamentos
+    await cargarObjetivosIngreso();
+    await cargarDiagnosticosIngreso();
+    await cargarMedicamentosIngreso();
+
+    // Abrir todas las secciones
+    ['ing-sec-anamnesis','ing-sec-plan','ing-sec-clinico','ing-sec-registro'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'block';
+    });
+    document.querySelectorAll('#modal-ingreso .seccion-badge').forEach(b => b.textContent = '−');
+
+    modal.style.display = 'flex';
 }
 
 function renderIndicadoresSesion(indicadores) {
@@ -548,8 +564,14 @@ function cerrarModalIngreso() {
     sesionActivaId = null;
     sesionData = null;
 
+    // Volver al origen: registro o dashboard
     if (window.location.search.includes('ingreso=true')) {
-        window.location.href = '/dashboard';
+        const referrer = document.referrer;
+        if (referrer.includes('/registro')) {
+            window.location.href = '/registro';
+        } else {
+            window.location.href = '/registro';
+        }
     }
 }
 
@@ -597,7 +619,6 @@ async function guardarRegistroIngreso() {
     if (res.ok) {
         alert("✅ Registro guardado correctamente");
         cerrarModalIngreso();
-        window.location.href = '/dashboard';
     } else {
         alert("Error al guardar registro");
     }
@@ -605,16 +626,29 @@ async function guardarRegistroIngreso() {
 
 // OBJETIVOS EN INGRESO
 async function cargarObjetivosIngreso() {
-    const res = await fetch(`${API}/objetivos/ciclo/${sesionData.ciclo_id}`);
+    const cicloId = sesionData?.ciclo_id || parseInt(document.getElementById('modal-ingreso').dataset.cicloId);
+    if (!cicloId) return;
+    const res = await fetch(`${API}/objetivos/ciclo/${cicloId}`);
     const objetivos = await res.json();
     const lista = document.getElementById('ing-lista-objetivos');
+    if (!lista) return;
 
-    if (objetivos.length === 0) {
-        lista.innerHTML = `<p style="color:#94a3b8; font-size:0.85rem;">Sin objetivos definidos</p>`;
+    // Cargar objetivo general si existe
+    const objGeneral = objetivos.find(o => o.es_general);
+    const campoGeneral = document.getElementById('ing-obj-general');
+    if (campoGeneral && objGeneral) {
+        campoGeneral.value = objGeneral.descripcion;
+    }
+
+    // Solo mostrar objetivos específicos en la lista
+    const especificos = objetivos.filter(o => !o.es_general);
+
+    if (especificos.length === 0) {
+        lista.innerHTML = `<p style="color:#94a3b8; font-size:0.85rem;">Sin objetivos específicos definidos</p>`;
         return;
     }
 
-    lista.innerHTML = await Promise.all(objetivos.map(async obj => {
+    lista.innerHTML = await Promise.all(especificos.map(async obj => {
         const resInd = await fetch(`${API}/indicadores/objetivo/${obj.id}`);
         const indicadores = await resInd.json();
         return `
@@ -643,15 +677,46 @@ async function cargarObjetivosIngreso() {
     })).then(htmls => htmls.join(''));
 }
 
+// Guarda objetivo general del ciclo (se llama desde guardarIngresoCompleto)
+async function guardarObjetivoGeneral(cicloId) {
+    const descripcion = document.getElementById('ing-obj-general')?.value?.trim();
+    if (!descripcion) return;
+
+    // Buscar si ya existe objetivo general
+    const res = await fetch(`${API}/objetivos/ciclo/${cicloId}`);
+    const objetivos = await res.json();
+    const existente = objetivos.find(o => o.es_general);
+
+    if (existente) {
+        // Actualizar
+        await fetch(`${API}/objetivos/${existente.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ descripcion, es_general: true })
+        });
+    } else {
+        // Crear nuevo
+        await fetch(`${API}/objetivos/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ciclo_id: cicloId, descripcion, es_general: true, tipo: null })
+        });
+    }
+}
+
+// Guarda objetivo específico
 async function guardarObjetivoIngreso() {
     const tipo = document.getElementById('ing-obj-tipo').value.trim();
     const descripcion = document.getElementById('ing-obj-descripcion').value.trim();
-    if (!tipo || !descripcion) { alert("⚠️ Tipo y descripción son obligatorios"); return; }
+    if (!tipo || !descripcion) { alert("⚠️ Área y descripción son obligatorios"); return; }
+    
+    const cicloId = sesionData?.ciclo_id || parseInt(document.getElementById('modal-ingreso').dataset.cicloId);
+    if (!cicloId) { alert("Error: no se encontró el ciclo"); return; }
 
     const res = await fetch(`${API}/objetivos/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ciclo_id: sesionData.ciclo_id, tipo, descripcion })
+        body: JSON.stringify({ ciclo_id: cicloId, tipo, descripcion, es_general: false })
     });
 
     if (res.ok) {
@@ -759,41 +824,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (params.get('ingreso') === 'true') {
         const cicloId = parseInt(params.get('ciclo'));
         const reservaId = parseInt(params.get('reserva')) || null;
+        const nuevoCiclo = params.get('nuevo_ciclo') === 'true';
         
         // Guardar datos para crear sesión solo cuando se guarde
-        sessionStorage.setItem('ingreso_pendiente', JSON.stringify({ cicloId, reservaId }));
+        sessionStorage.setItem('ingreso_pendiente', JSON.stringify({ cicloId, reservaId, nuevoCiclo }));
         
         // Abrir modal de ingreso sin crear sesión aún
-        await abrirModalIngresoPendiente(cicloId, reservaId);
+        await abrirModalIngresoPendiente(cicloId, reservaId, nuevoCiclo);
     }
 });
-
-async function abrirModalIngresoPendiente(cicloId, reservaId) {
-    sesionActivaId = null;
-    sesionData = { 
-        ciclo_id: cicloId, 
-        ciclo_numero: fichaData.ciclos.length + 1,
-        es_ingreso: true,
-        actividades: null,
-        fecha: null,
-        materiales: null,
-        compromisos: null,
-        indicadores: []
-    };
-
+async function abrirModalIngresoPendiente(cicloId, reservaId, nuevoCiclo = false) {
+    // Si es inicio de nuevo ciclo, precargar anamnesis del ciclo anterior
+    if (nuevoCiclo && fichaData?.ciclos?.length > 1) {
+        const cicloAnterior = fichaData.ciclos[1];
+        try {
+            const res = await fetch(`${API}/anamnesis/ciclo/${cicloAnterior.id}`);
+            if (res.ok) {
+                const anamnesis = await res.json();
+                document.getElementById('ing-motivo').value = anamnesis.motivo_consulta || '';
+                document.getElementById('ing-antecedentes').value = anamnesis.antecedentes || '';
+                document.getElementById('ing-expectativas').value = anamnesis.expectativas_tutor || '';
+                document.getElementById('ing-evaluaciones').value = anamnesis.evaluaciones_aplicadas || '';
+                document.getElementById('ing-area-motora').value = anamnesis.area_motora || 'Normal';
+                document.getElementById('ing-area-cognitiva').value = anamnesis.area_cognitiva || 'Normal';
+                document.getElementById('ing-area-sensorial').value = anamnesis.area_sensorial || 'Normal';
+                document.getElementById('ing-area-social').value = anamnesis.area_social || 'Normal';
+                document.getElementById('ing-fotografia').checked = anamnesis.tiene_fotografia || false;
+            }
+        } catch (e) {}
+    }
     const tituloHtml = `
         <div style="display:flex; flex-direction:column; gap:4px;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <span>⭐</span>
                 <span>Sesión de Ingreso</span>
                 <span class="estado-badge" style="background:#fef9c3; color:#854d0e; font-size:0.75rem;">
-                    Ciclo ${sesionData.ciclo_numero}
+                    Ciclo ${sesionData?.ciclo_numero || (fichaData?.ciclos?.length || 1)}
                 </span>
             </div>
             <div style="display:flex; gap:8px;">
-                <span class="tag">👤 ${fichaData.nombre}</span>
-                <span class="tag">🎂 ${fichaData.edad} años</span>
-                <span class="tag">🪪 ${fichaData.rut}</span>
+                <span class="tag">👤 ${fichaData?.nombre || ''}</span>
+                <span class="tag">🎂 ${fichaData?.edad || ''} años</span>
+                <span class="tag">🪪 ${fichaData?.rut || ''}</span>
             </div>
         </div>
     `;
@@ -821,8 +893,9 @@ async function abrirModalIngresoPendiente(cicloId, reservaId) {
     document.getElementById('modal-ingreso').style.display = 'flex';
     
     // Guardar reservaId para usar al guardar
-    document.getElementById('modal-ingreso').dataset.reservaId = reservaId;
     document.getElementById('modal-ingreso').dataset.cicloId = cicloId;
+    document.getElementById('modal-ingreso').dataset.reservaId = reservaId;
+    await cargarObjetivosIngreso();
 }
 
 async function guardarRegistroIngreso() {
@@ -909,5 +982,78 @@ async function convertirEnSesion() {
         await abrirSesion(sesionId);
     } else {
         alert("Error al convertir sesión");
+    }
+}
+// ===========================================
+// GUARDAR INGRESO COMPLETO
+// Guarda anamnesis, objetivo general, sesión en un solo paso
+// ===========================================
+async function guardarIngresoCompleto() {
+    const modal = document.getElementById('modal-ingreso');
+    const cicloId = parseInt(modal.dataset.cicloId);
+    const reservaId = parseInt(modal.dataset.reservaId) || null;
+
+    if (!cicloId) {
+        alert("Error: no se encontró el ciclo");
+        return;
+    }
+
+    try {
+        // 1. Guardar anamnesis
+        await fetch(`${API}/anamnesis/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ciclo_id: cicloId,
+                motivo_consulta: document.getElementById('ing-motivo').value || null,
+                antecedentes: document.getElementById('ing-antecedentes').value || null,
+                expectativas_tutor: document.getElementById('ing-expectativas').value || null,
+                evaluaciones_aplicadas: document.getElementById('ing-evaluaciones').value || null,
+                area_motora: document.getElementById('ing-area-motora').value,
+                area_cognitiva: document.getElementById('ing-area-cognitiva').value,
+                area_sensorial: document.getElementById('ing-area-sensorial').value,
+                area_social: document.getElementById('ing-area-social').value,
+                tiene_fotografia: document.getElementById('ing-fotografia').checked
+            })
+        });
+
+        // 2. Guardar objetivo general
+        await guardarObjetivoGeneral(cicloId);
+
+        // 3. Crear sesión si no existe
+        if (!sesionActivaId) {
+            const resCrear = await fetch(`${API}/sesiones/crear-ingreso`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ciclo_id: cicloId, reserva_id: reservaId })
+            });
+            const creada = await resCrear.json();
+            sesionActivaId = creada.id;
+        }
+
+        // 4. Guardar registro de sesión
+        await fetch(`${API}/sesiones/${sesionActivaId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fecha: document.getElementById('ing-fecha').value || null,
+                actividades: document.getElementById('ing-actividades').value || null,
+                materiales: document.getElementById('ing-materiales').value || null,
+                compromisos: document.getElementById('ing-compromisos').value || null
+            })
+        });
+
+        sessionStorage.removeItem('ingreso_pendiente');
+        alert("✅ Ingreso guardado correctamente");
+        cerrarModalIngreso();
+        await cargarFicha();
+        // Si el ciclo estaba abierto en el historial, reabrirlo
+        if (window._cicloAbierto) {
+            await toggleCiclo(window._cicloAbierto);
+        }
+
+    } catch (error) {
+        console.error("Error guardando ingreso:", error);
+        alert("Error al guardar el ingreso");
     }
 }

@@ -1543,3 +1543,45 @@ input:focus {
     border: 1px solid #fecdd3;
     opacity: 0.85;
 }
+
+/* ==========================================
+   MODAL INGRESO — Estructura sticky
+   ========================================== */
+
+.modal-ingreso-wrapper {
+    max-width: 700px;
+    width: 95%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.modal-ingreso-header-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 16px 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    flex-shrink: 0;
+}
+
+.modal-ingreso-body {
+    overflow-y: auto;
+    flex-grow: 1;
+    padding-bottom: 8px;
+}
+
+.modal-ingreso-footer {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    border-top: 1px solid #e2e8f0;
+    padding: 12px 20px;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    flex-shrink: 0;
+}

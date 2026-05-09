@@ -124,14 +124,16 @@ class SesionRespuesta(BaseModel):
 
 class ObjetivoCrear(BaseModel):
     ciclo_id: int
-    tipo: str
+    tipo: Optional[str] = None
     descripcion: str
+    es_general: bool = False
 
 class ObjetivoRespuesta(BaseModel):
     id: int
     ciclo_id: int
-    tipo: str
+    tipo: Optional[str] = None
     descripcion: str
+    es_general: bool= False
 
     class Config:
         from_attributes = True

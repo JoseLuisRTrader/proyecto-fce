@@ -1,149 +1,197 @@
-    <div id="modal-ingreso" class="modal-overlay">
-        <div class="modal-content" style="max-width: 700px; width: 95%; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header">
-                <h2 id="ingreso-modal-titulo">⭐ Sesión de Ingreso</h2>
-                <button class="btn-close" onclick="cerrarModalIngreso()">&times;</button>
+<div id="modal-ingreso" class="modal-overlay">
+        <div class="modal-ingreso-wrapper">
+
+            <!-- HEADER FIJO -->
+            <div class="modal-ingreso-header-sticky">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <div id="ingreso-modal-titulo">⭐ Sesión de Ingreso</div>
+                    </div>
+                    <button class="btn-close" onclick="cerrarModalIngreso()" style="font-size:1.5rem;">&times;</button>
+                </div>
             </div>
 
-            <div class="tabs-container">
-                <button class="tab-btn active" onclick="cambiarTabIngreso('anamnesis')">📋 Anamnesis</button>
-                <button class="tab-btn" onclick="cambiarTabIngreso('plan')">🎯 Plan terapéutico</button>
-                <button class="tab-btn" onclick="cambiarTabIngreso('clinico')">💊 Clínico</button>
-                <button class="tab-btn" onclick="cambiarTabIngreso('registro')">📝 Registro sesión</button>
+            <!-- BODY SCROLLEABLE -->
+            <div class="modal-ingreso-body">
+
+                <!-- SECCIÓN ANAMNESIS -->
+                <div class="form-seccion">
+                    <h4 class="form-seccion-titulo collapsible" onclick="toggleSeccion('ing-sec-anamnesis', this)">
+                        📋 Anamnesis <span class="seccion-badge">−</span>
+                    </h4>
+                    <div id="ing-sec-anamnesis" style="display:block;">
+                        <div class="form-grid-2" style="padding:16px;">
+                            <div class="form-group" style="grid-column:1/-1;">
+                                <label>Motivo de consulta</label>
+                                <textarea id="ing-motivo" rows="3" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
+                            </div>
+                            <div class="form-group" style="grid-column:1/-1;">
+                                <label>Antecedentes relevantes</label>
+                                <textarea id="ing-antecedentes" rows="3" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
+                            </div>
+                            <div class="form-group" style="grid-column:1/-1;">
+                                <label>Expectativas del tutor</label>
+                                <textarea id="ing-expectativas" rows="2" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
+                            </div>
+                            <div class="form-group" style="grid-column:1/-1;">
+                                <label>Evaluaciones aplicadas</label>
+                                <textarea id="ing-evaluaciones" rows="2" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;" placeholder="Ej: TEPSI aplicado — resultado: riesgo en área motora (puntaje 28)"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Área motora</label>
+                                <select id="ing-area-motora">
+                                    <option value="Normal">Normal</option>
+                                    <option value="Riesgo">Riesgo</option>
+                                    <option value="Retraso">Retraso</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Área cognitiva</label>
+                                <select id="ing-area-cognitiva">
+                                    <option value="Normal">Normal</option>
+                                    <option value="Riesgo">Riesgo</option>
+                                    <option value="Retraso">Retraso</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Área sensorial</label>
+                                <select id="ing-area-sensorial">
+                                    <option value="Normal">Normal</option>
+                                    <option value="Riesgo">Riesgo</option>
+                                    <option value="Retraso">Retraso</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Área social</label>
+                                <select id="ing-area-social">
+                                    <option value="Normal">Normal</option>
+                                    <option value="Riesgo">Riesgo</option>
+                                    <option value="Retraso">Retraso</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="grid-column:1/-1;">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                    <input type="checkbox" id="ing-fotografia"> Fotografía de evaluación adjunta
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN PLAN TERAPÉUTICO -->
+                <div class="form-seccion">
+                    <h4 class="form-seccion-titulo collapsible" onclick="toggleSeccion('ing-sec-plan', this)">
+                        🎯 Plan Terapéutico <span class="seccion-badge">+</span>
+                    </h4>
+                    <div id="ing-sec-plan" style="display:none; padding:16px;">
+                        
+                        <!-- OBJETIVO GENERAL -->
+                        <div style="margin-bottom:16px;">
+                            <label style="font-weight:600; color:#1f2937; display:block; margin-bottom:6px;">
+                                🎯 Objetivo General
+                                <span style="font-size:0.75rem; color:#94a3b8; font-weight:400; margin-left:6px;">(uno por ciclo)</span>
+                            </label>
+                            <textarea id="ing-obj-general" rows="3" 
+                                style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"
+                                placeholder="Ej: Mejorar la funcionalidad y autonomía en actividades de vida diaria..."></textarea>
+                        </div>
+
+                        <hr style="margin:16px 0;">
+
+                        <!-- OBJETIVOS ESPECÍFICOS -->
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:600; color:#1f2937; display:block; margin-bottom:10px;">
+                                📌 Objetivos Específicos e Indicadores
+                            </label>
+                            <div id="ing-lista-objetivos"></div>
+                        </div>
+
+                        <!-- FORMULARIO NUEVO OBJETIVO ESPECÍFICO -->
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+                            <h5 style="margin:0 0 10px 0; color:#64748b; font-size:0.85rem;">➕ Agregar Objetivo Específico</h5>
+                            <div class="form-grid-2">
+                                <div class="form-group">
+                                    <label>Área *</label>
+                                    <input type="text" id="ing-obj-tipo" placeholder="Motor, Cognitivo, Sensorial...">
+                                </div>
+                                <div class="form-group" style="grid-column:1/-1;">
+                                    <label>Descripción *</label>
+                                    <input type="text" id="ing-obj-descripcion" placeholder="Ej: Mejorar coordinación motora gruesa">
+                                </div>
+                            </div>
+                            <button class="btn-secondary" onclick="guardarObjetivoIngreso()">➕ Agregar Objetivo</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN CLÍNICO -->
+                <div class="form-seccion">
+                    <h4 class="form-seccion-titulo collapsible" onclick="toggleSeccion('ing-sec-clinico', this)">
+                        💊 Clínico <span class="seccion-badge">+</span>
+                    </h4>
+                    <div id="ing-sec-clinico" style="display:none; padding:16px;">
+                        <h4>📋 Diagnósticos</h4>
+                        <div id="ing-lista-diagnosticos"></div>
+                        <div class="form-grid-2" style="margin-top:8px;">
+                            <div class="form-group">
+                                <label>Descripción *</label>
+                                <input type="text" id="ing-diag-desc">
+                            </div>
+                            <div class="form-group">
+                                <label>Tipo *</label>
+                                <input type="text" id="ing-diag-tipo">
+                            </div>
+                        </div>
+                        <button class="btn-secondary" onclick="guardarDiagnosticoIngreso()">➕ Agregar Diagnóstico</button>
+                        <hr style="margin:16px 0;">
+                        <h4>💊 Medicamentos</h4>
+                        <div id="ing-lista-medicamentos"></div>
+                        <div class="form-grid-2" style="margin-top:8px;">
+                            <div class="form-group">
+                                <label>Nombre *</label>
+                                <input type="text" id="ing-med-nombre">
+                            </div>
+                            <div class="form-group">
+                                <label>Dosis</label>
+                                <input type="text" id="ing-med-dosis">
+                            </div>
+                        </div>
+                        <button class="btn-secondary" onclick="guardarMedicamentoIngreso()">➕ Agregar Medicamento</button>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN REGISTRO SESIÓN -->
+                <div class="form-seccion">
+                    <h4 class="form-seccion-titulo collapsible" onclick="toggleSeccion('ing-sec-registro', this)">
+                        📝 Registro de Sesión <span class="seccion-badge">+</span>
+                    </h4>
+                    <div id="ing-sec-registro" style="display:none; padding:16px;">
+                        <div class="form-group">
+                            <label>Fecha</label>
+                            <input type="date" id="ing-fecha">
+                        </div>
+                        <div class="form-group">
+                            <label>Actividades realizadas</label>
+                            <textarea id="ing-actividades" rows="4" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Materiales</label>
+                            <textarea id="ing-materiales" rows="2" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Compromisos</label>
+                            <textarea id="ing-compromisos" rows="2" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
-            <!-- ANAMNESIS -->
-            <div id="itab-anamnesis" class="tab-content active" style="padding:16px 20px;">
-                <div class="form-grid-2">
-                    <div class="form-group" style="grid-column:1/-1;">
-                        <label>Motivo de consulta</label>
-                        <textarea id="ing-motivo" rows="3" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
-                    </div>
-                    <div class="form-group" style="grid-column:1/-1;">
-                        <label>Antecedentes relevantes</label>
-                        <textarea id="ing-antecedentes" rows="3" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
-                    </div>
-                    <div class="form-group" style="grid-column:1/-1;">
-                        <label>Expectativas del tutor</label>
-                        <textarea id="ing-expectativas" rows="2" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
-                    </div>
-                    <div class="form-group" style="grid-column:1/-1;">
-                        <label>Evaluaciones aplicadas</label>
-                        <textarea id="ing-evaluaciones" rows="2" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;" placeholder="Ej: TEPSI aplicado — resultado: riesgo en área motora (puntaje 28)"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Área motora</label>
-                        <select id="ing-area-motora">
-                            <option value="Normal">Normal</option>
-                            <option value="Riesgo">Riesgo</option>
-                            <option value="Retraso">Retraso</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Área cognitiva</label>
-                        <select id="ing-area-cognitiva">
-                            <option value="Normal">Normal</option>
-                            <option value="Riesgo">Riesgo</option>
-                            <option value="Retraso">Retraso</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Área sensorial</label>
-                        <select id="ing-area-sensorial">
-                            <option value="Normal">Normal</option>
-                            <option value="Riesgo">Riesgo</option>
-                            <option value="Retraso">Retraso</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Área social</label>
-                        <select id="ing-area-social">
-                            <option value="Normal">Normal</option>
-                            <option value="Riesgo">Riesgo</option>
-                            <option value="Retraso">Retraso</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="grid-column:1/-1;">
-                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                            <input type="checkbox" id="ing-fotografia"> Fotografía de evaluación adjunta
-                        </label>
-                    </div>
-                </div>
-                <button class="btn-primary" style="margin-top:16px;" onclick="guardarAnamnesis()">💾 Guardar Anamnesis</button>
-            </div>
-
-            <!-- PLAN TERAPÉUTICO -->
-            <div id="itab-plan" class="tab-content" style="padding:16px 20px;">
-                <div id="ing-lista-objetivos"></div>
-                <hr style="margin:16px 0;">
-                <h4 id="ing-obj-titulo">Agregar Objetivo</h4>
-                <div class="form-grid-2">
-                    <div class="form-group">
-                        <label>Tipo *</label>
-                        <input type="text" id="ing-obj-tipo" placeholder="Motor, Cognitivo, Sensorial...">
-                    </div>
-                    <div class="form-group" style="grid-column:1/-1;">
-                        <label>Descripción *</label>
-                        <input type="text" id="ing-obj-descripcion" placeholder="Ej: Mejorar coordinación motora gruesa">
-                    </div>
-                </div>
-                <button class="btn-primary" onclick="guardarObjetivoIngreso()">➕ Agregar Objetivo</button>
-            </div>
-
-            <!-- CLÍNICO -->
-            <div id="itab-clinico" class="tab-content" style="padding:16px 20px;">
-                <h4>📋 Diagnósticos</h4>
-                <div id="ing-lista-diagnosticos"></div>
-                <hr style="margin:12px 0;">
-                <div class="form-grid-2">
-                    <div class="form-group">
-                        <label>Descripción *</label>
-                        <input type="text" id="ing-diag-desc">
-                    </div>
-                    <div class="form-group">
-                        <label>Tipo *</label>
-                        <input type="text" id="ing-diag-tipo">
-                    </div>
-                </div>
-                <button class="btn-secondary" onclick="guardarDiagnosticoIngreso()">➕ Agregar Diagnóstico</button>
-
-                <hr style="margin:20px 0;">
-
-                <h4>💊 Medicamentos</h4>
-                <div id="ing-lista-medicamentos"></div>
-                <hr style="margin:12px 0;">
-                <div class="form-grid-2">
-                    <div class="form-group">
-                        <label>Nombre *</label>
-                        <input type="text" id="ing-med-nombre">
-                    </div>
-                    <div class="form-group">
-                        <label>Dosis</label>
-                        <input type="text" id="ing-med-dosis">
-                    </div>
-                </div>
-                <button class="btn-secondary" onclick="guardarMedicamentoIngreso()">➕ Agregar Medicamento</button>
-            </div>
-
-            <!-- REGISTRO SESIÓN -->
-            <div id="itab-registro" class="tab-content" style="padding:16px 20px;">
-                <div class="form-group">
-                    <label>Fecha</label>
-                    <input type="date" id="ing-fecha">
-                </div>
-                <div class="form-group">
-                    <label>Actividades realizadas</label>
-                    <textarea id="ing-actividades" rows="4" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Materiales</label>
-                    <textarea id="ing-materiales" rows="3" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Compromisos</label>
-                    <textarea id="ing-compromisos" rows="3" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
-                </div>
-                <button class="btn-primary" style="margin-top:16px;" onclick="guardarRegistroIngreso()">💾 Guardar Registro</button>
+            <!-- BOTÓN FLOTANTE INFERIOR -->
+            <div class="modal-ingreso-footer">
+                <button class="btn-primary" style="width:100%;" onclick="guardarIngresoCompleto()">
+                    💾 Guardar Ingreso Completo
+                </button>
             </div>
 
         </div>

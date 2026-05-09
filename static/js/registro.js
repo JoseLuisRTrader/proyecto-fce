@@ -114,7 +114,7 @@ async function abrirModalAtencion(reservaId, usuarioId) {
 
         // Detectar primera sesión → redirigir a ficha
         if (data.es_primera_sesion) {
-            window.location.href = `/ficha/${usuarioId}?ingreso=true&ciclo=${data.ciclo_activo_id}&reserva=${reservaId}`;
+            window.location.href = `/ficha/${usuarioId}?ingreso=true&ciclo=${data.ciclo_activo_id}&reserva=${reservaId}&nuevo_ciclo=${data.es_inicio_nuevo_ciclo}`;
             return;
         }
 

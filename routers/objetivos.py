@@ -41,3 +41,14 @@ def eliminar_objetivo(objetivo_id: int, db: Session = Depends(get_db)):
     db.delete(objetivo)
     db.commit()
     return {"mensaje": "Objetivo eliminado"}
+@router.put("/{objetivo_id}", response_model=ObjetivoRespuesta)
+def actualizar_objetivo(objetivo_id: int, datos: dict, db: Session = Depends(get_db)):
+    objetivo = db.query(Objetivo).filter(Objetivo.id == objetivo_id).first()
+    if not objetivo:
+        raise HTTPException(status_code=404, detail="Objetivo no encontrado")
+    for campo, valor in datos.items():
+        if hasattr(objetivo, campo):
+            setattr(objetivo, campo, valor)
+    db.commit()
+    db.refresh(objetivo)
+    return objetivo

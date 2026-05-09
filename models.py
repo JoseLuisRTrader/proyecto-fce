@@ -51,15 +51,17 @@ class Reserva(Base):
     usuario = relationship("Usuario", back_populates="reservas")
     bloque = relationship("BloqueHorario", back_populates="reserva")
     sesion = relationship("Sesion", back_populates="reserva", uselist=False)
-
 class Ciclo(Base):
     __tablename__ = "ciclos"
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     profesional_id = Column(Integer, ForeignKey("profesionales.id"))
     fecha_inicio = Column(Date)
+    fecha_cierre = Column(Date, nullable=True)        # ← nuevo
     numero_sesiones = Column(Integer, default=0)
     estado = Column(String, default="activo")
+    motivo_cierre = Column(String, nullable=True)     # ← nuevo
+    observacion_cierre = Column(Text, nullable=True)  # ← nuevo
 
     usuario = relationship("Usuario", back_populates="ciclos")
     objetivos = relationship("Objetivo", back_populates="ciclo")
@@ -72,6 +74,7 @@ class Objetivo(Base):
     ciclo_id = Column(Integer, ForeignKey("ciclos.id"))
     tipo = Column(String, nullable=False)
     descripcion = Column(Text, nullable=False)
+    es_general = Column(Boolean, default=False)
 
     ciclo = relationship("Ciclo", back_populates="objetivos")
     indicadores = relationship("IndicadorLogro", back_populates="objetivo")
@@ -96,7 +99,7 @@ class Sesion(Base):
     materiales = Column(Text)
     compromisos = Column(Text)
     es_ingreso = Column(Boolean, default=False)
-    es_inasistencia = Column(Boolean, default=False)
+    es_inasistencia = Column(Boolean, default=False, server_default='0')
 
     ciclo = relationship("Ciclo", back_populates="sesiones")
     reserva = relationship("Reserva", back_populates="sesion")

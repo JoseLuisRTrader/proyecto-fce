@@ -1,17 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from database import SessionLocal, get_db
+from database import get_db
 import models, schemas
 from datetime import date
 
-
-
 router = APIRouter(
-    prefix="/usuarios", # Antes estaba con "U" mayúscula, corregido a minúscula
+    prefix="/usuarios",
     tags=["Usuarios"]
 )
-
-
 
 @router.post("/", response_model=schemas.UsuarioRespuesta)
 def crear_usuario(usuario: schemas.UsuarioCrear, db: Session = Depends(get_db)):
@@ -30,22 +26,14 @@ def crear_usuario(usuario: schemas.UsuarioCrear, db: Session = Depends(get_db)):
         establecimiento_educacional=usuario.establecimiento_educacional,
         tarifa_pactada=usuario.tarifa_pactada
     )
-    
     db.add(nuevo_usuario)
     db.commit()
     db.refresh(nuevo_usuario)
     return nuevo_usuario
 
-@router.get("/", response_model=list[schemas.UsuarioRespuesta]) # <-- Cambiado de "/usuarios" a "/"
+@router.get("/", response_model=list[schemas.UsuarioRespuesta])
 def listar_usuarios(db: Session = Depends(get_db)):
     return db.query(models.Usuario).all()
-
-@router.get("/{usuario_id}", response_model=schemas.UsuarioRespuesta)
-def obtener_usuario(usuario_id: int, db: Session = Depends(get_db)):
-    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return usuario
 
 @router.get("/detalle-atencion/{usuario_id}")
 def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
@@ -58,13 +46,19 @@ def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
         (hoy.month, hoy.day) < (user.fecha_nacimiento.month, user.fecha_nacimiento.day)
     )
 
+    diag = db.query(models.Diagnostico).filter(
+        models.Diagnostico.usuario_id == usuario_id
+    ).all()
+
     total_sesiones = db.query(models.Sesion).join(models.Ciclo).filter(
         models.Ciclo.usuario_id == usuario_id
     ).count()
 
-    diag = db.query(models.Diagnostico).filter(
-        models.Diagnostico.usuario_id == usuario_id
-    ).all()
+    # Contar ciclos previos cerrados
+    ciclos_previos = db.query(models.Ciclo).filter(
+        models.Ciclo.usuario_id == usuario_id,
+        models.Ciclo.estado == "cerrado"
+    ).count()
 
     # Ciclo activo
     ciclo_activo = db.query(models.Ciclo).filter(
@@ -73,15 +67,24 @@ def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
     ).first()
 
     es_primera_sesion = False
+    es_inicio_nuevo_ciclo = False
     sesion_id_activa = None
     indicadores = []
     sesiones_ciclo_count = 0
 
     if ciclo_activo:
+        # Contar sesiones reales (excluir inasistencias)
         sesiones_ciclo_count = db.query(models.Sesion).filter(
-            models.Sesion.ciclo_id == ciclo_activo.id
+            models.Sesion.ciclo_id == ciclo_activo.id,
+            models.Sesion.es_inasistencia == False
         ).count()
-        es_primera_sesion = sesiones_ciclo_count == 0
+
+        # CASO 1: Sin ciclos previos y sin sesiones → primer ingreso del sistema
+        # CASO 2: Con ciclos previos y sin sesiones en ciclo actual → inicio nuevo ciclo
+        # CASO 3: Con sesiones en ciclo actual → sesión de continuidad
+        if sesiones_ciclo_count == 0:
+            es_primera_sesion = True
+            es_inicio_nuevo_ciclo = ciclos_previos > 0
 
         # Sesión de hoy
         sesion_hoy = db.query(models.Sesion).join(models.Reserva).join(models.BloqueHorario).filter(
@@ -91,7 +94,7 @@ def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
         if sesion_hoy:
             sesion_id_activa = sesion_hoy.id
 
-        # Indicadores del ciclo activo con su evaluación más reciente
+        # Indicadores del ciclo activo
         objetivos = db.query(models.Objetivo).filter(
             models.Objetivo.ciclo_id == ciclo_activo.id
         ).all()
@@ -111,12 +114,26 @@ def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
                     "cumplido": ultima_eval.cumplido if ultima_eval else None
                 })
 
-    nombre_tutor = user.nombre_tutor or "No asignado"
+    elif not ciclo_activo:
+        # Sin ciclo activo → crear uno y marcar como primera sesión
+        nuevo_ciclo = models.Ciclo(
+            usuario_id=usuario_id,
+            profesional_id=1,
+            fecha_inicio=hoy,
+            numero_sesiones=0,
+            estado="activo"
+        )
+        db.add(nuevo_ciclo)
+        db.commit()
+        db.refresh(nuevo_ciclo)
+        ciclo_activo = nuevo_ciclo
+        es_primera_sesion = True
+        es_inicio_nuevo_ciclo = ciclos_previos > 0
 
     return {
         "nombre": user.nombre,
         "edad": edad,
-        "nombre_tutor": nombre_tutor,
+        "nombre_tutor": user.nombre_tutor or "No asignado",
         "ultimo_diagnostico": diag[0].descripcion if diag else "Sin diagnóstico registrado",
         "diagnosticos": [{"id": d.id, "descripcion": d.descripcion, "tipo": d.tipo} for d in diag],
         "total_sesiones": total_sesiones,
@@ -124,11 +141,20 @@ def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
         "indicadores": indicadores,
         "foto_url": user.foto_url,
         "es_primera_sesion": es_primera_sesion,
+        "es_inicio_nuevo_ciclo": es_inicio_nuevo_ciclo,
         "ciclo_activo_id": ciclo_activo.id if ciclo_activo else None,
         "sesion_id_activa": sesion_id_activa,
         "sesiones_ciclo_actual": sesiones_ciclo_count
     }
 
+@router.get("/{usuario_id}", response_model=schemas.UsuarioRespuesta)
+def obtener_usuario(usuario_id: int, db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return usuario
+
+@router.put("/{usuario_id}")
 def actualizar_usuario(usuario_id: int, datos: schemas.UsuarioActualizar, db: Session = Depends(get_db)):
     usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
     if not usuario:
