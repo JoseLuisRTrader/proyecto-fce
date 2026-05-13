@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Date, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from database import Base
-from datetime import date
+from datetime import date, datetime
 
 class Profesional(Base):
     __tablename__ = "profesionales"
@@ -72,7 +72,7 @@ class Objetivo(Base):
     __tablename__ = "objetivos"
     id = Column(Integer, primary_key=True, index=True)
     ciclo_id = Column(Integer, ForeignKey("ciclos.id"))
-    tipo = Column(String, nullable=False)
+    tipo = Column(String, nullable=True)
     descripcion = Column(Text, nullable=False)
     es_general = Column(Boolean, default=False)
 
@@ -100,6 +100,11 @@ class Sesion(Base):
     compromisos = Column(Text)
     es_ingreso = Column(Boolean, default=False)
     es_inasistencia = Column(Boolean, default=False, server_default='0')
+    eliminado = Column(Boolean, default=False, server_default='0')
+    fecha_eliminacion = Column(Date, nullable=True)
+    motivo_eliminacion = Column(Text, nullable=True)
+    fecha_creacion = Column(DateTime, default=datetime.now)
+    recuperado = Column(Boolean, default=False, server_default='0')
 
     ciclo = relationship("Ciclo", back_populates="sesiones")
     reserva = relationship("Reserva", back_populates="sesion")

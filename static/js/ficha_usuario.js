@@ -90,6 +90,8 @@ function cambiarVistaHistorial(vista) {
     vistaHistorial = vista;
     document.getElementById('btn-hist-compacta').classList.toggle('activo', vista === 'compacta');
     document.getElementById('btn-hist-completa').classList.toggle('activo', vista === 'completa');
+    const btnPapelera = document.getElementById('btn-hist-papelera');
+    if (btnPapelera) btnPapelera.classList.toggle('activo', vista === 'papelera');
     renderCiclos();
 }
 
@@ -108,6 +110,8 @@ function renderCiclos() {
 
     if (vistaHistorial === 'compacta') {
         renderCiclosCompacta(divCiclos);
+    } else if (vistaHistorial === 'papelera') {
+        renderCiclosPapelera(divCiclos);
     } else {
         renderCiclosCompleta(divCiclos);
     }
@@ -120,8 +124,8 @@ function renderCiclosCompacta(contenedor) {
         const estadoLabel = c.estado === 'activo' ? '🟢 Activo' : '✅ Cerrado';
         return `
             <div class="ciclo-expandible">
-                <div class="ciclo-header" onclick="toggleCiclo(${c.id})">
-                    <div class="ciclo-header-izq">
+                <div class="ciclo-header">
+                    <div class="ciclo-header-izq" onclick="toggleCiclo(${c.id})" style="cursor:pointer; flex:1;">
                         <span class="semaforo-dot" id="semaforo-ciclo-${c.id}" style="background:#94a3b8;"></span>
                         <strong>Ciclo ${numCiclo}</strong>
                         <span style="color:#94a3b8; font-size:0.8rem; margin-left:8px;">${c.fecha_inicio}</span>
@@ -131,7 +135,12 @@ function renderCiclosCompacta(contenedor) {
                             ${estadoLabel}
                         </span>
                         <span style="color:#64748b; font-size:0.82rem;">${c.numero_sesiones} sesiones</span>
-                        <span class="ciclo-flecha" id="flecha-ciclo-${c.id}">▶</span>
+                        <button class="btn-accion-mini" style="background:#dbeafe; color:#2563eb; border-color:#bfdbfe;"
+                                onclick="registrarSesionCiclo(${c.id})">📝 Registrar</button>
+                        <button class="btn-accion-mini" id="btn-eliminar-ciclo-${c.id}"
+                                style="background:#fff1f2; color:#e11d48; border-color:#fecdd3;"
+                                onclick="toggleModoEliminacion(${c.id})">🗑️ Eliminar</button>
+                        <span class="ciclo-flecha" id="flecha-ciclo-${c.id}" onclick="toggleCiclo(${c.id})" style="cursor:pointer;">▶</span>
                     </div>
                 </div>
                 <div class="ciclo-sesiones" id="sesiones-ciclo-${c.id}" style="display:none;"></div>
@@ -172,12 +181,15 @@ async function renderCiclosCompleta(contenedor) {
 
     contenedor.innerHTML = todasLasSesiones.map(s => {
         const color = coloresCiclos[(s.numCiclo - 1) % coloresCiclos.length];
+        const labelRecuperada = s.recuperado
+            ? ` <span style="color:#2563eb; font-size:0.72rem; font-weight:600;">↩️ recuperada</span>`
+            : '';
         return `
         <div class="sesion-completa-item"
              style="background:${color.bg}; border-left: 3px solid ${color.border};"
              onclick="abrirSesion(${s.id})">
             <div class="sesion-completa-izq">
-                <span class="sesion-numero">${s.es_ingreso ? '⭐' : '📝'} Sesión ${s.numero_sesion}</span>
+                <span class="sesion-numero">${s.es_ingreso ? '⭐' : '📝'} Sesión ${s.numero_sesion}</span>${labelRecuperada}
                 <span style="color:#94a3b8; font-size:0.75rem;">Ciclo ${s.numCiclo}</span>
                 <span class="sesion-fecha">${s.fecha || '—'}</span>
             </div>
@@ -189,6 +201,83 @@ async function renderCiclosCompleta(contenedor) {
             </button>
         </div>
     `}).join('');
+}
+
+// ==========================================
+// VISTA PAPELERA — sesiones eliminadas (30 días)
+// ==========================================
+
+async function renderCiclosPapelera(contenedor) {
+    contenedor.innerHTML = `<p style="color:#94a3b8; text-align:center; padding:20px;">Cargando papelera...</p>`;
+
+    let todasEliminadas = [];
+
+    for (const ciclo of fichaData.ciclos) {
+        try {
+            const res = await fetch(`${API}/ciclos/${ciclo.id}/papelera`);
+            if (!res.ok) continue;
+            const eliminadas = await res.json();
+            const numCiclo = fichaData.ciclos.length - fichaData.ciclos.indexOf(ciclo);
+            eliminadas.forEach(s => todasEliminadas.push({ ...s, numCiclo, cicloId: ciclo.id }));
+        } catch (err) {
+            console.error(`Error cargando papelera ciclo ${ciclo.id}:`, err);
+        }
+    }
+
+    if (todasEliminadas.length === 0) {
+        contenedor.innerHTML = `
+            <div style="text-align:center; padding:30px; color:#94a3b8;">
+                <div style="font-size:2rem; margin-bottom:8px;">🗑️</div>
+                <p style="font-size:0.85rem;">La papelera está vacía</p>
+                <p style="font-size:0.75rem; color:#cbd5e1;">Las sesiones eliminadas permanecen aquí 30 días</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Más recientes primero (menos días restantes = más cerca de expirar arriba)
+    todasEliminadas.sort((a, b) => (a.dias_restantes ?? 30) - (b.dias_restantes ?? 30));
+
+    contenedor.innerHTML = todasEliminadas.map(s => {
+        const dias = s.dias_restantes ?? 0;
+        const colorDias = dias <= 7 ? '#e11d48' : (dias <= 15 ? '#f97316' : '#64748b');
+        const tipoIcon = s.es_inasistencia ? '❌' : (s.es_ingreso ? '⭐' : '📝');
+        const tipoLabel = s.es_inasistencia
+            ? 'Inasistencia'
+            : (s.es_ingreso ? 'Ingreso' : `Sesión ${s.numero_sesion || '?'}`);
+
+        return `
+        <div class="sesion-item" style="background:#fafafa; border-left:3px solid #e2e8f0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <div style="flex:1; min-width:0;">
+                    <span class="sesion-numero">${tipoIcon} ${tipoLabel}</span>
+                    <span style="color:#94a3b8; font-size:0.75rem; margin-left:8px;">Ciclo ${s.numCiclo}</span>
+                    <span class="sesion-fecha" style="margin-left:8px;">${s.fecha || '—'}</span>
+                </div>
+                <span style="color:${colorDias}; font-size:0.78rem; font-weight:600;">
+                    ⏳ ${dias} día${dias === 1 ? '' : 's'}
+                </span>
+                <button class="btn-accion-mini"
+                        style="background:#dbeafe; color:#2563eb; border-color:#bfdbfe;"
+                        onclick="restaurarSesionPapelera(${s.id}, ${s.cicloId})">
+                    ↩️ Restaurar
+                </button>
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+async function restaurarSesionPapelera(sesionId, cicloId) {
+    if (!confirm("¿Restaurar esta sesión desde la papelera?")) return;
+    const res = await fetch(`${API}/sesiones/${sesionId}/restaurar`, { method: 'POST' });
+    if (!res.ok) {
+        alert("Error al restaurar la sesión.");
+        return;
+    }
+    await cargarFicha();
+    // Mantener al usuario en la vista papelera tras restaurar
+    cambiarVistaHistorial('papelera');
 }
 
 function calcularSemaforoCiclo(sesiones) {
@@ -223,27 +312,18 @@ async function toggleCiclo(cicloId) {
                 return;
             }
 
-            contenedor.innerHTML = sesiones.map(s => `
-                <div class="sesion-item" style="cursor:pointer;" onclick="abrirSesion(${s.id})">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <span class="sesion-numero">${s.es_ingreso ? '⭐' : '📝'} Sesión ${s.numero_sesion}</span>
-                            <span class="sesion-fecha" style="margin-left:10px;">${s.fecha || '—'}</span>
-                        </div>
-                        <button class="btn-accion-mini" onclick="event.stopPropagation(); abrirSesion(${s.id})">Ver/Editar</button>
-                    </div>
-                    <p class="sesion-actividades">${s.actividades || 'Sin registro de actividades'}</p>
-                </div>
-            `).join('');
             contenedor.innerHTML = sesiones.map(s => {
                 const esInasistencia = s.es_inasistencia;
+                const labelRecuperada = s.recuperado
+                    ? ` <span style="color:#2563eb; font-size:0.72rem; font-weight:600;">↩️ recuperada</span>`
+                    : '';
                 return `
                     <div class="sesion-item ${esInasistencia ? 'sesion-inasistencia' : ''}" style="cursor:pointer;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
                                 <span class="sesion-numero">
                                     ${esInasistencia ? '❌ Inasistencia' : (s.es_ingreso ? '⭐' : '📝') + ' Sesión ' + s.numero_sesion}
-                                </span>
+                                </span>${labelRecuperada}
                                 <span class="sesion-fecha" style="margin-left:10px;">${s.fecha || '—'}</span>
                             </div>
                             <button class="btn-accion-mini" onclick="event.stopPropagation(); ${esInasistencia ? `abrirModalInasistencia(${s.id})` : `abrirSesion(${s.id})`}">
@@ -500,6 +580,27 @@ async function guardarSesion() {
         compromisos: document.getElementById('sesion-compromisos').value || null
     };
 
+    // Crear sesión normal si aún no existe (flujo "Registrar" desde ficha del ciclo activo)
+    // Usa POST /sesiones/crear-normal (sesiones 2..N de un ciclo que ya tiene su ingreso)
+    if (!sesionActivaId) {
+        const cicloId = sesionData?.ciclo_id;
+        if (!cicloId) {
+            alert("Error: no se pudo determinar el ciclo de la sesión.");
+            return;
+        }
+        const resCrear = await fetch(`${API}/sesiones/crear-normal`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ciclo_id: cicloId, reserva_id: null })
+        });
+        if (!resCrear.ok) {
+            alert("Error al crear la sesión.");
+            return;
+        }
+        const creada = await resCrear.json();
+        sesionActivaId = creada.id;
+    }
+
     const res = await fetch(`${API}/sesiones/${sesionActivaId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -699,7 +800,7 @@ async function guardarObjetivoGeneral(cicloId) {
         await fetch(`${API}/objetivos/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ciclo_id: cicloId, descripcion, es_general: true, tipo: null })
+            body: JSON.stringify({ ciclo_id: cicloId, descripcion, es_general: true, tipo: 'general' })  
         });
     }
 }
@@ -1055,5 +1156,382 @@ async function guardarIngresoCompleto() {
     } catch (error) {
         console.error("Error guardando ingreso:", error);
         alert("Error al guardar el ingreso");
+    }
+}
+
+// --- BOTÓN REGISTRAR EN FICHA ---
+// Detecta el tipo de sesión y abre el modal correspondiente
+async function abrirRegistroFicha() {
+    try {
+        const res = await fetch(`${API}/usuarios/detalle-atencion/${usuarioId}`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+
+        if (data.es_primera_sesion) {
+            // Caso 1 o 2: modal de ingreso
+            const cicloId = data.ciclo_activo_id;
+            
+            // Buscar reserva de hoy si existe
+            let reservaId = data.sesion_id_activa || null;
+
+            sesionActivaId = null;
+            sesionData = {
+                ciclo_id: cicloId,
+                ciclo_numero: fichaData.ciclos.length || 1,
+                es_ingreso: true,
+                actividades: null,
+                fecha: null,
+                materiales: null,
+                compromisos: null,
+                indicadores: []
+            };
+
+            const modal = document.getElementById('modal-ingreso');
+            modal.dataset.cicloId = cicloId;
+            modal.dataset.reservaId = reservaId || '';
+
+            // Título del modal
+            document.getElementById('ingreso-modal-titulo').innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>⭐</span>
+                        <span>Sesión de Ingreso</span>
+                        <span class="estado-badge" style="background:#fef9c3; color:#854d0e; font-size:0.75rem;">
+                            Ciclo ${fichaData.ciclos.length || 1}
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <span class="tag">👤 ${fichaData.nombre}</span>
+                        <span class="tag">🎂 ${fichaData.edad} años</span>
+                        <span class="tag">🪪 ${fichaData.rut}</span>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('ing-fecha').value = new Date().toISOString().split('T')[0];
+            await cargarObjetivosIngreso();
+            await cargarDiagnosticosIngreso();
+            await cargarMedicamentosIngreso();
+
+            // Cargar anamnesis si existe
+            try {
+                const resAnam = await fetch(`${API}/anamnesis/ciclo/${cicloId}`);
+                if (resAnam.ok) {
+                    const anamnesis = await resAnam.json();
+                    document.getElementById('ing-motivo').value = anamnesis.motivo_consulta || '';
+                    document.getElementById('ing-antecedentes').value = anamnesis.antecedentes || '';
+                    document.getElementById('ing-expectativas').value = anamnesis.expectativas_tutor || '';
+                    document.getElementById('ing-evaluaciones').value = anamnesis.evaluaciones_aplicadas || '';
+                    document.getElementById('ing-area-motora').value = anamnesis.area_motora || 'Normal';
+                    document.getElementById('ing-area-cognitiva').value = anamnesis.area_cognitiva || 'Normal';
+                    document.getElementById('ing-area-sensorial').value = anamnesis.area_sensorial || 'Normal';
+                    document.getElementById('ing-area-social').value = anamnesis.area_social || 'Normal';
+                    document.getElementById('ing-fotografia').checked = anamnesis.tiene_fotografia || false;
+                }
+            } catch (e) {}
+
+            modal.style.display = 'flex';
+
+        } else {
+            // Caso 3: modal de registro normal
+            // Buscar sesión existente de hoy si hay
+            let sesionExistente = null;
+            if (data.sesion_id_activa) {
+                const resSesion = await fetch(`${API}/sesiones/${data.sesion_id_activa}/detalle`);
+                if (resSesion.ok) sesionExistente = await resSesion.json();
+            }
+
+            // Abrir modal de sesión normal
+            sesionActivaId = data.sesion_id_activa || null;
+            sesionData = sesionExistente || {
+                ciclo_id: data.ciclo_activo_id,
+                ciclo_numero: fichaData.ciclos.length,
+                es_ingreso: false,
+                actividades: null,
+                indicadores: []
+            };
+
+            const modal = document.getElementById('modal-sesion');
+            document.getElementById('sesion-modal-titulo').innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>📝 Sesión ${data.sesiones_ciclo_actual + 1}</span>
+                        <span class="estado-badge" style="background:#dbeafe; color:#2563eb; font-size:0.75rem;">
+                            Ciclo ${fichaData.ciclos.length}
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <span class="tag">👤 ${fichaData.nombre}</span>
+                        <span class="tag">🎂 ${fichaData.edad} años</span>
+                        <span class="tag">🪪 ${fichaData.rut}</span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('sesion-fecha').value = sesionExistente?.fecha || new Date().toISOString().split('T')[0];
+            document.getElementById('sesion-actividades').value = sesionExistente?.actividades || '';
+            document.getElementById('sesion-materiales').value = sesionExistente?.materiales || '';
+            document.getElementById('sesion-compromisos').value = sesionExistente?.compromisos || '';
+            renderIndicadoresSesion(sesionExistente?.indicadores || []);
+            modal.style.display = 'flex';
+        }
+
+    } catch (error) {
+        console.error("Error abriendo registro:", error);
+        alert("No se pudo cargar la información del usuario.");
+    }
+}
+// ===========================================
+// REGISTRAR SESIÓN DESDE CICLO
+// ===========================================
+
+// Registra una nueva sesión para el ciclo especificado
+async function registrarSesionCiclo(cicloId) {
+    try {
+        const res = await fetch(`${API}/usuarios/detalle-atencion/${usuarioId}`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+
+        // Verificar que el ciclo seleccionado es el activo
+        if (data.ciclo_activo_id !== cicloId) {
+            alert("⚠️ Solo puedes registrar sesiones en el ciclo activo.");
+            return;
+        }
+
+        if (data.es_primera_sesion) {
+            // Modal de ingreso
+            const modal = document.getElementById('modal-ingreso');
+            modal.dataset.cicloId = cicloId;
+            modal.dataset.reservaId = '';
+            sesionActivaId = null;
+            sesionData = {
+                ciclo_id: cicloId,
+                ciclo_numero: fichaData.ciclos.length,
+                es_ingreso: true,
+                actividades: null, fecha: null, materiales: null, compromisos: null, indicadores: []
+            };
+            document.getElementById('ingreso-modal-titulo').innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>⭐ Sesión de Ingreso</span>
+                        <span class="estado-badge" style="background:#fef9c3; color:#854d0e; font-size:0.75rem;">
+                            Ciclo ${fichaData.ciclos.length}
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <span class="tag">👤 ${fichaData.nombre}</span>
+                        <span class="tag">🎂 ${fichaData.edad} años</span>
+                    </div>
+                </div>`;
+            document.getElementById('ing-fecha').value = new Date().toISOString().split('T')[0];
+            await cargarObjetivosIngreso();
+            await cargarDiagnosticosIngreso();
+            await cargarMedicamentosIngreso();
+            try {
+                const resAnam = await fetch(`${API}/anamnesis/ciclo/${cicloId}`);
+                if (resAnam.ok) {
+                    const a = await resAnam.json();
+                    document.getElementById('ing-motivo').value = a.motivo_consulta || '';
+                    document.getElementById('ing-antecedentes').value = a.antecedentes || '';
+                    document.getElementById('ing-expectativas').value = a.expectativas_tutor || '';
+                    document.getElementById('ing-evaluaciones').value = a.evaluaciones_aplicadas || '';
+                    document.getElementById('ing-area-motora').value = a.area_motora || 'Normal';
+                    document.getElementById('ing-area-cognitiva').value = a.area_cognitiva || 'Normal';
+                    document.getElementById('ing-area-sensorial').value = a.area_sensorial || 'Normal';
+                    document.getElementById('ing-area-social').value = a.area_social || 'Normal';
+                }
+            } catch (e) {}
+            modal.style.display = 'flex';
+        } else {
+            // Modal de sesión normal
+            sesionActivaId = null;
+            sesionData = {
+                ciclo_id: cicloId,
+                ciclo_numero: fichaData.ciclos.length,
+                es_ingreso: false,
+                actividades: null, indicadores: data.indicadores || []
+            };
+            const modal = document.getElementById('modal-sesion');
+            document.getElementById('sesion-modal-titulo').innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>📝 Sesión ${data.sesiones_ciclo_actual + 1}</span>
+                        <span class="estado-badge" style="background:#dbeafe; color:#2563eb; font-size:0.75rem;">
+                            Ciclo ${fichaData.ciclos.length}
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <span class="tag">👤 ${fichaData.nombre}</span>
+                        <span class="tag">🎂 ${fichaData.edad} años</span>
+                    </div>
+                </div>`;
+            document.getElementById('sesion-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('sesion-actividades').value = '';
+            document.getElementById('sesion-materiales').value = '';
+            document.getElementById('sesion-compromisos').value = '';
+            renderIndicadoresSesion(data.indicadores || []);
+            modal.style.display = 'flex';
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        alert("No se pudo cargar la información del usuario.");
+    }
+}
+
+// ===========================================
+// MODO ELIMINACIÓN CON CHECKBOXES
+// ===========================================
+
+let modoEliminacionActivo = {};
+
+// Activa/desactiva el modo de selección para eliminar sesiones
+async function toggleModoEliminacion(cicloId) {
+    const contenedor = document.getElementById(`sesiones-ciclo-${cicloId}`);
+    const btn = document.getElementById(`btn-eliminar-ciclo-${cicloId}`);
+
+    // Si el ciclo está cerrado, abrir primero
+    if (contenedor.style.display === 'none') {
+        await toggleCiclo(cicloId);
+    }
+
+    if (modoEliminacionActivo[cicloId]) {
+        // Desactivar modo eliminación
+        modoEliminacionActivo[cicloId] = false;
+        btn.textContent = '🗑️ Eliminar';
+        btn.style.background = '#fff1f2';
+        await toggleCiclo(cicloId);
+        await toggleCiclo(cicloId);
+    } else {
+        // Activar modo eliminación
+        modoEliminacionActivo[cicloId] = true;
+        btn.textContent = '❌ Cancelar';
+        btn.style.background = '#fee2e2';
+        renderModoEliminacion(cicloId);
+    }
+}
+
+// Renderiza las sesiones con checkboxes para selección
+async function renderModoEliminacion(cicloId) {
+    const contenedor = document.getElementById(`sesiones-ciclo-${cicloId}`);
+    const res = await fetch(`${API}/ciclos/${cicloId}/sesiones`);
+    const sesiones = await res.json();
+    sesiones.reverse();
+
+    if (sesiones.length === 0) {
+        contenedor.innerHTML = `<p style="color:#94a3b8; padding:10px;">Sin sesiones para eliminar</p>`;
+        return;
+    }
+
+    contenedor.innerHTML = `
+        <div style="padding:8px 12px; background:#fff7ed; border-bottom:1px solid #fed7aa; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.82rem; color:#9a3412;">Selecciona las sesiones a eliminar</span>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-accion-mini" style="background:#dcfce7; color:#16a34a; border-color:#86efac;"
+                        onclick="confirmarEliminacion(${cicloId})">✅ Confirmar</button>
+            </div>
+        </div>
+        ${sesiones.map(s => {
+            const esInasistencia = s.es_inasistencia;
+            const esIngreso = s.es_ingreso;
+            const bloqueado = esIngreso;
+            return `
+                <div class="sesion-item ${esInasistencia ? 'sesion-inasistencia' : ''} ${bloqueado ? 'sesion-bloqueada' : ''}"
+                     style="display:flex; align-items:center; gap:10px; opacity:${bloqueado ? '0.5' : '1'}">
+                    <input type="checkbox" 
+                           id="chk-sesion-${s.id}"
+                           data-es-ingreso="${esIngreso}"
+                           ${bloqueado ? 'disabled title="El ingreso no puede eliminarse individualmente"' : ''}
+                           style="width:16px; height:16px; cursor:${bloqueado ? 'not-allowed' : 'pointer'};">
+                    <div style="flex:1;">
+                        <span class="sesion-numero">
+                            ${esInasistencia ? '❌ Inasistencia' : (esIngreso ? '⭐ Ingreso' : '📝 Sesión ' + s.numero_sesion)}
+                            ${esIngreso ? '<span style="font-size:0.7rem; color:#ef4444; margin-left:4px;">(elimina todo el ciclo)</span>' : ''}
+                        </span>
+                        <span class="sesion-fecha" style="margin-left:8px;">${s.fecha || '—'}</span>
+                    </div>
+                </div>
+            `;
+        }).join('')}
+    `;
+}
+
+// Confirma la eliminación de sesiones seleccionadas
+async function confirmarEliminacion(cicloId) {
+    const checkboxes = document.querySelectorAll(`#sesiones-ciclo-${cicloId} input[type="checkbox"]:checked`);
+    
+    if (checkboxes.length === 0) {
+        alert("⚠️ No has seleccionado ninguna sesión.");
+        return;
+    }
+
+    const ids = Array.from(checkboxes).map(c => parseInt(c.id.replace('chk-sesion-', '')));
+    const tieneIngreso = Array.from(checkboxes).some(c => c.dataset.esIngreso === 'true');
+
+    if (tieneIngreso) {
+        // Advertencia especial para ingreso
+        const confirmado = confirm(
+            "⚠️ Has seleccionado la sesión de INGRESO.\n\n" +
+            "Esto eliminará el CICLO COMPLETO y TODAS sus sesiones.\n\n" +
+            "¿Confirmas la eliminación del ciclo completo?"
+        );
+        if (!confirmado) return;
+        await eliminarCicloCompleto(cicloId);
+    } else {
+        const confirmado = confirm(`¿Eliminar ${ids.length} sesión${ids.length > 1 ? 'es' : ''}?\n\nPodrás recuperarlas desde la papelera dentro de 30 días.`);
+        if (!confirmado) return;
+
+        for (const id of ids) {
+            await fetch(`${API}/sesiones/${id}`, { method: 'DELETE' });
+        }
+        alert("✅ Sesiones eliminadas. Puedes recuperarlas desde la papelera.");
+    }
+
+    modoEliminacionActivo[cicloId] = false;
+    const btn = document.getElementById(`btn-eliminar-ciclo-${cicloId}`);
+    if (btn) { btn.textContent = '🗑️ Eliminar'; btn.style.background = '#fff1f2'; }
+    await cargarFicha();
+    await toggleCiclo(cicloId);
+}
+
+// Elimina el ciclo completo y todas sus sesiones
+async function eliminarCicloCompleto(cicloId) {
+    const res = await fetch(`${API}/ciclos/${cicloId}/eliminar`, { method: 'DELETE' });
+    if (res.ok) {
+        alert("✅ Ciclo eliminado completamente.");
+        await cargarFicha();
+    } else {
+        alert("Error al eliminar el ciclo.");
+    }
+}
+
+// ===========================================
+// PAPELERA — Ver y restaurar sesiones eliminadas
+// ===========================================
+
+// Muestra la papelera del ciclo
+async function verPapelera(cicloId) {
+    const res = await fetch(`${API}/ciclos/${cicloId}/papelera`);
+    const sesiones = await res.json();
+
+    if (sesiones.length === 0) {
+        alert("La papelera está vacía para este ciclo.");
+        return;
+    }
+
+    // Mostrar en modal simple
+    const lista = sesiones.map(s => 
+        `Sesión ${s.numero_sesion || '?'} · ${s.fecha || '?'} · Eliminada hace ${30 - s.dias_restantes} días (${s.dias_restantes} días restantes)`
+    ).join('\n');
+
+    const restaurar = confirm(
+        `🗑️ Papelera del ciclo:\n\n${lista}\n\n¿Deseas restaurar todas las sesiones eliminadas?`
+    );
+
+    if (restaurar) {
+        for (const s of sesiones) {
+            await fetch(`${API}/sesiones/${s.id}/restaurar`, { method: 'POST' });
+        }
+        alert("✅ Sesiones restauradas correctamente.");
+        await cargarFicha();
+        await toggleCiclo(cicloId);
     }
 }

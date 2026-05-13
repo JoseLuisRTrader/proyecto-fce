@@ -15,6 +15,7 @@
             <div class="ficha-header-top">
                 <button class="btn-volver" onclick="window.location.href='/usuarios'">← Volver</button>
                 <div class="ficha-acciones">
+                    <button class="btn-accion-rapida" id="btn-registrar-ficha" onclick="abrirRegistroFicha()">📝 Registrar</button>
                     <button class="btn-accion-rapida" onclick="abrirEditarFicha()">✏️ Editar</button>
                     <button class="btn-accion-rapida" onclick="abrirCambiarEstadoFicha(event)">🔄 Estado</button>
                 </div>
@@ -80,6 +81,7 @@
                     <div class="vista-toggle" style="margin:0;">
                         <button class="btn-vista activo" id="btn-hist-compacta" onclick="cambiarVistaHistorial('compacta')">☰ Compacta</button>
                         <button class="btn-vista" id="btn-hist-completa" onclick="cambiarVistaHistorial('completa')">📋 Completa</button>
+                        <button class="btn-vista" id="btn-hist-papelera" onclick="cambiarVistaHistorial('papelera')">🗑️ Papelera</button>
                     </div>
                 </div>
                 <div id="ficha-ciclos" style="margin-top:12px;"></div>

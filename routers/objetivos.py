@@ -12,7 +12,10 @@ router = APIRouter(
 
 @router.post("/", response_model=ObjetivoRespuesta)
 def crear_objetivo(objetivo: ObjetivoCrear, db: Session = Depends(get_db)):
-    nuevo = Objetivo(**objetivo.dict())
+    datos = objetivo.dict()
+    if not datos.get('tipo'):
+        datos['tipo'] = 'general'  # valor por defecto
+    nuevo = Objetivo(**datos)
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
