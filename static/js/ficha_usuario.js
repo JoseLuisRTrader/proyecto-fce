@@ -269,21 +269,32 @@ async function renderCiclosCompleta(contenedor) {
         const labelRecuperada = s.recuperado
             ? ` <span style="color:#2563eb; font-size:0.72rem; font-weight:600;">↩️ recuperada</span>`
             : '';
+        const labelTipo = s.es_inasistencia
+            ? '❌ Inasistencia'
+            : `${s.es_ingreso ? '⭐' : '📝'} Sesión ${s.numero_sesion}`;
+
         return `
         <div class="sesion-completa-item"
-             style="background:${color.bg}; border-left: 3px solid ${color.border};"
-             onclick="abrirSesion(${s.id})">
-            <div class="sesion-completa-izq">
-                <span class="sesion-numero">${s.es_ingreso ? '⭐' : '📝'} Sesión ${s.numero_sesion}</span>${labelRecuperada}
+             style="background:${color.bg}; border-left: 3px solid ${color.border};">
+            <div class="sesion-completa-izq" onclick="${s.es_inasistencia ? `abrirModalInasistencia(${s.id})` : `abrirSesion(${s.id})`}" style="cursor:pointer; flex:1;">
+                <span class="sesion-numero">${labelTipo}</span>${labelRecuperada}
                 <span style="color:#94a3b8; font-size:0.75rem;">Ciclo ${s.numCiclo}</span>
                 <span class="sesion-fecha">${s.fecha || '—'}</span>
             </div>
-            <div class="sesion-completa-der">
+            <div class="sesion-completa-der" style="flex:2;">
                 <p class="sesion-actividades">${s.actividades || 'Sin registro'}</p>
             </div>
-            <button class="btn-accion-mini" onclick="event.stopPropagation(); ${s.es_inasistencia ? `abrirModalInasistencia(${s.id})` : `abrirSesion(${s.id})`}">
-                ${s.es_inasistencia ? 'Ver/Eliminar' : 'Ver/Editar'}
-            </button>
+            <div style="display:flex; gap:4px; flex-shrink:0;">
+                <button class="btn-accion-mini"
+                        onclick="event.stopPropagation(); ${s.es_inasistencia ? `abrirModalInasistencia(${s.id})` : `abrirSesion(${s.id})`}">
+                    ${s.es_inasistencia ? 'Ver/Eliminar' : 'Ver/Editar'}
+                </button>
+                <button class="btn-accion-mini"
+                        style="background:#fff1f2; color:#e11d48; border-color:#fecdd3;"
+                        onclick="event.stopPropagation(); eliminarSesionDirecta(${s.id})">
+                    🗑️
+                </button>
+            </div>
         </div>
     `}).join('');
 }
@@ -1186,6 +1197,18 @@ async function eliminarInasistencia() {
         await cargarFicha();
     } else {
         alert("Error al eliminar");
+    }
+}
+
+// Elimina directamente una sesión desde la vista completa (soft delete → papelera 30 días)
+async function eliminarSesionDirecta(sesionId) {
+    if (!confirm("¿Mover esta sesión a la papelera? Podrás recuperarla dentro de 30 días.")) return;
+    const res = await fetch(`${API}/sesiones/${sesionId}`, { method: 'DELETE' });
+    if (res.ok) {
+        await cargarFicha();
+        cambiarVistaHistorial('completa');
+    } else {
+        alert("Error al eliminar la sesión");
     }
 }
 
