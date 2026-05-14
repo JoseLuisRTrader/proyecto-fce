@@ -36,7 +36,7 @@ def listar_usuarios(db: Session = Depends(get_db)):
     return db.query(models.Usuario).all()
 
 @router.get("/detalle-atencion/{usuario_id}")
-def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
+def obtener_detalle_atencion(usuario_id: int, crear_ciclo: bool = False, db: Session = Depends(get_db)):    
     user = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -115,18 +115,18 @@ def obtener_detalle_atencion(usuario_id: int, db: Session = Depends(get_db)):
                 })
 
     elif not ciclo_activo:
-        # Sin ciclo activo → crear uno y marcar como primera sesión
-        nuevo_ciclo = models.Ciclo(
-            usuario_id=usuario_id,
-            profesional_id=1,
-            fecha_inicio=hoy,
-            numero_sesiones=0,
-            estado="activo"
-        )
-        db.add(nuevo_ciclo)
-        db.commit()
-        db.refresh(nuevo_ciclo)
-        ciclo_activo = nuevo_ciclo
+        if crear_ciclo:
+            nuevo_ciclo = models.Ciclo(
+                usuario_id=usuario_id,
+                profesional_id=1,
+                fecha_inicio=hoy,
+                numero_sesiones=0,
+                estado="activo"
+            )
+            db.add(nuevo_ciclo)
+            db.commit()
+            db.refresh(nuevo_ciclo)
+            ciclo_activo = nuevo_ciclo
         es_primera_sesion = True
         es_inicio_nuevo_ciclo = ciclos_previos > 0
 

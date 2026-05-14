@@ -198,13 +198,69 @@ def crear_sesion_normal(datos: dict, db: Session = Depends(get_db)):
     db.refresh(nueva)
     return {"id": nueva.id, "creada": True}
 
+@router.post("/crear-inasistencia")
+def crear_inasistencia(datos: dict, db: Session = Depends(get_db)):
+    """
+    Registra inasistencia desde la ficha del usuario (Opción C):
+    - Si hay reserva confirmada del usuario para hoy → la vincula y marca nsp
+    - Si no hay reserva → crea inasistencia libre sin reserva_id
+    """
+    ciclo_id = datos.get("ciclo_id")
+    usuario_id = datos.get("usuario_id")
+
+    ciclo = db.query(models.Ciclo).filter(models.Ciclo.id == ciclo_id).first()
+    if not ciclo:
+        raise HTTPException(status_code=404, detail="Ciclo no encontrado")
+    if ciclo.estado != "activo":
+        raise HTTPException(status_code=400, detail="El ciclo no está activo")
+
+    # Verificar si ya existe inasistencia hoy para este ciclo
+    existente = db.query(models.Sesion).filter(
+        models.Sesion.ciclo_id == ciclo_id,
+        models.Sesion.fecha == date.today(),
+        models.Sesion.es_inasistencia == True,
+        models.Sesion.eliminado != True
+    ).first()
+    if existente:
+        raise HTTPException(status_code=400, detail="Ya existe una inasistencia registrada para hoy")
+
+    # Caso A: buscar reserva confirmada del usuario para hoy
+    reserva = db.query(models.Reserva)\
+        .join(models.BloqueHorario, models.Reserva.bloque_horario_id == models.BloqueHorario.id)\
+        .filter(
+            models.Reserva.usuario_id == usuario_id,
+            models.Reserva.estado == "confirmada",
+            models.BloqueHorario.fecha == date.today()
+        ).first()
+
+    reserva_id = None
+    if reserva:
+        reserva.estado = "nsp"
+        reserva_id = reserva.id
+
+    # Crear sesión de inasistencia (con o sin reserva_id)
+    nueva = models.Sesion(
+        ciclo_id=ciclo_id,
+        reserva_id=reserva_id,
+        fecha=date.today(),
+        numero_sesion=None,
+        actividades="Inasistencia",
+        es_ingreso=False,
+        es_inasistencia=True,
+        eliminado=False
+    )
+    db.add(nueva)
+    db.commit()
+    db.refresh(nueva)
+    return {"id": nueva.id, "creada": True, "reserva_vinculada": reserva_id is not None}
+
 @router.get("/por-reserva/{reserva_id}")
 def obtener_sesion_por_reserva(reserva_id: int, db: Session = Depends(get_db)):
     sesion = db.query(models.Sesion).filter(
         models.Sesion.reserva_id == reserva_id
     ).first()
     if not sesion:
-        raise HTTPException(status_code=404, detail="Sin sesión registrada")
+        return None  # "ausencia" no es "error" — el frontend ya maneja el caso vacío
     return {
         "id": sesion.id,
         "actividades": sesion.actividades,

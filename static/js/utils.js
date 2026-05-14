@@ -161,6 +161,14 @@ async function guardarDatosUsuario(callbackExito) {
     }
 }
 
+// Refresca la vista que esté activa al guardar cambios del usuario.
+// La ficha define cargarFicha(); la lista de usuarios define cargarUsuarios().
+// Se llama desde el modal compartido (_modal_editar_ficha.html).
+function refrescarVistaUsuario() {
+    if (typeof cargarFicha === 'function') return cargarFicha();
+    if (typeof cargarUsuarios === 'function') return cargarUsuarios();
+}
+
 // ===========================================
 // DIAGNÓSTICOS — Funciones compartidas
 // ===========================================

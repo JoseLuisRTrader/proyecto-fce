@@ -102,8 +102,7 @@ function renderTabla(usuarios) {
                             <td style="text-align:center;">0</td>
                             <td style="text-align:right;">
                                 <button class="btn-accion-mini" onclick="verUsuario(${u.id})">👁️ Ver</button>
-                                <button class="btn-accion-mini" onclick="editarUsuario(${u.id})">✏️ Editar</button>
-                                <button class="btn-accion-mini" onclick="abrirCambiarEstado(event, ${u.id})">🔄 Estado</button>
+                                <button class="btn-accion-mini" onclick="abrirEditarUsuario(${u.id})">✏️ Editar</button>
                             </td>
                         </tr>
                     `;
@@ -131,8 +130,7 @@ function renderCards(usuarios) {
                 </span>
                 <span class="usuario-card-tutor">${u.nombre_tutor ? '👤 ' + u.nombre_tutor : 'Sin tutor'}</span>
                 <div class="usuario-card-acciones">
-                    <button class="btn-accion-mini" onclick="event.stopPropagation(); editarUsuario(${u.id})">✏️</button>
-                    <button class="btn-accion-mini" onclick="event.stopPropagation(); abrirCambiarEstado(event, ${u.id})">🔄</button>
+                    <button class="btn-accion-mini" onclick="event.stopPropagation(); abrirEditarUsuario(${u.id})">✏️</button>
                 </div>
             </div>
         `;
@@ -158,8 +156,7 @@ function renderCompacta(usuarios) {
                     ${estado.label}
                 </span>
                 <div class="acciones-compacta">
-                    <button class="btn-accion-mini" onclick="event.stopPropagation(); editarUsuario(${u.id})">✏️</button>
-                    <button class="btn-accion-mini" onclick="event.stopPropagation(); abrirCambiarEstado(event, ${u.id})">🔄</button>
+                    <button class="btn-accion-mini" onclick="event.stopPropagation(); abrirEditarUsuario(${u.id})">✏️</button>
                 </div>
             </div>
         `;
@@ -170,32 +167,8 @@ function verUsuario(id) {
     window.location.href = `/ficha/${id}`;
 }
 
-async function editarUsuario(id) {
-    usuarioActivoId = id;
-    
-    try {
-        const res = await fetch(`${API}/usuarios/${id}`);
-        const u = await res.json();
-        
-        document.getElementById('edit-nombre').value = u.nombre || '';
-        document.getElementById('edit-rut').value = u.rut || '';
-        document.getElementById('edit-fecha-nacimiento').value = u.fecha_nacimiento || '';
-        document.getElementById('edit-telefono1').value = u.telefono_1 || '';
-        document.getElementById('edit-telefono2').value = u.telefono_2 || '';
-        document.getElementById('edit-email').value = u.email || '';
-        document.getElementById('edit-tutor').value = u.nombre_tutor || '';
-        document.getElementById('edit-establecimiento').value = u.establecimiento_educacional || '';
-        document.getElementById('edit-tarifa').value = u.tarifa_pactada || '';
-
-        await cargarDiagnosticos();
-        await cargarMedicamentos();
-
-        document.getElementById('modal-editar-usuario').style.display = 'flex';
-    } catch (error) {
-        console.error("Error cargando usuario:", error);
-        alert("No se pudo cargar el usuario");
-    }
-}
+// editarUsuario() fue removida — ahora se usa abrirEditarUsuario() de utils.js
+// (módulo compartido central, reutilizado por la ficha y por la lista de usuarios)
 
 // DROPDOWN ESTADO
 function abrirCambiarEstado(event, id) {

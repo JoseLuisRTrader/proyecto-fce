@@ -132,8 +132,13 @@ def obtener_pendientes(db: Session = Depends(get_db)):
 @router.get("/sesiones-pendientes")
 def obtener_sesiones_pendientes(db: Session = Depends(get_db)):
     hoy = date.today()
-    
-    reservas_sin_registro = db.query(
+
+    # Reservas confirmadas con fecha <= hoy que NO tienen sesión registrada.
+    # Se considera "registrada" si:
+    #   (A) hay una sesión vinculada por reserva_id con actividades, O
+    #   (B) el usuario tiene una sesión con actividades en la misma fecha de la reserva
+    #       (caso: registrado desde la ficha sin reserva_id).
+    reservas = db.query(
         models.Reserva.id.label("reserva_id"),
         models.Usuario.id.label("usuario_id"),
         models.Usuario.nombre,
@@ -143,12 +148,9 @@ def obtener_sesiones_pendientes(db: Session = Depends(get_db)):
         models.BloqueHorario.hora_inicio.label("hora")
     ).join(models.BloqueHorario, models.Reserva.bloque_horario_id == models.BloqueHorario.id)\
      .join(models.Usuario, models.Reserva.usuario_id == models.Usuario.id)\
-     .outerjoin(models.Sesion, models.Sesion.reserva_id == models.Reserva.id)\
      .filter(
-        models.BloqueHorario.fecha <= hoy,
-        models.Reserva.estado == "confirmada"
-     ).filter(
-        (models.Sesion.id == None) | (models.Sesion.actividades == None)
+         models.BloqueHorario.fecha <= hoy,
+         models.Reserva.estado == "confirmada"
      ).order_by(models.BloqueHorario.fecha.asc())\
      .all()
 
@@ -156,47 +158,34 @@ def obtener_sesiones_pendientes(db: Session = Depends(get_db)):
     meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
              "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
 
-    return [
-        {
-            "reserva_id": r.reserva_id,
-            "usuario_id": r.usuario_id,
-            "nombre": r.nombre,
-            "rut": r.rut,
-            "foto_url": r.foto_url or f"https://ui-avatars.com/api/?name={r.nombre.replace(' ', '+')}&background=2563eb&color=fff",
-            "fecha": str(r.fecha),
-            "fecha_label": f"{dias_semana[r.fecha.weekday()]} {r.fecha.day} de {meses[r.fecha.month - 1]}",
-            "hora": r.hora,
-            "es_hoy": r.fecha == hoy  # ← este campo separa hoy de anteriores
-        }
-        for r in reservas_sin_registro
-    ]
+    resultado = []
+    for r in reservas:
+        # Caso A: sesión vinculada por reserva_id con actividades registradas
+        sesion_por_reserva = db.query(models.Sesion).filter(
+            models.Sesion.reserva_id == r.reserva_id,
+            models.Sesion.actividades != None,
+            models.Sesion.eliminado != True
+        ).first()
 
-    # Reservas pasadas sin sesión registrada o con sesión sin actividades
-    reservas_sin_registro = db.query(
-        models.Reserva.id.label("reserva_id"),
-        models.Usuario.id.label("usuario_id"),
-        models.Usuario.nombre,
-        models.Usuario.rut,
-        models.Usuario.foto_url,
-        models.BloqueHorario.fecha,
-        models.BloqueHorario.hora_inicio.label("hora")
-    ).join(models.BloqueHorario, models.Reserva.bloque_horario_id == models.BloqueHorario.id)\
-     .join(models.Usuario, models.Reserva.usuario_id == models.Usuario.id)\
-     .outerjoin(models.Sesion, models.Sesion.reserva_id == models.Reserva.id)\
-     .filter(
-        models.BloqueHorario.fecha <= hoy,
-        models.Reserva.estado == "confirmada"
-     ).filter(
-        (models.Sesion.id == None) | (models.Sesion.actividades == None)
-     ).order_by(models.BloqueHorario.fecha.asc())\
-     .all()
+        if sesion_por_reserva:
+            continue  # ya registrada por flujo normal
 
-    dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-    meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", 
-             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        # Caso B: sesión del usuario en la misma fecha, sin reserva_id
+        # (registrada desde la ficha directamente)
+        sesion_por_fecha = db.query(models.Sesion)\
+            .join(models.Ciclo, models.Sesion.ciclo_id == models.Ciclo.id)\
+            .filter(
+                models.Ciclo.usuario_id == r.usuario_id,
+                models.Sesion.fecha == r.fecha,
+                models.Sesion.actividades != None,
+                models.Sesion.es_inasistencia != True,
+                models.Sesion.eliminado != True
+            ).first()
 
-    return [
-        {
+        if sesion_por_fecha:
+            continue  # ya registrada desde la ficha
+
+        resultado.append({
             "reserva_id": r.reserva_id,
             "usuario_id": r.usuario_id,
             "nombre": r.nombre,
@@ -206,9 +195,9 @@ def obtener_sesiones_pendientes(db: Session = Depends(get_db)):
             "fecha_label": f"{dias_semana[r.fecha.weekday()]} {r.fecha.day} de {meses[r.fecha.month - 1]}",
             "hora": r.hora,
             "es_hoy": r.fecha == hoy
-        }
-        for r in reservas_sin_registro
-    ]
+        })
+
+    return resultado
 
 @router.get("/estadisticas-registro")
 def obtener_estadisticas_registro(db: Session = Depends(get_db)):

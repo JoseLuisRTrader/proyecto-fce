@@ -15,7 +15,6 @@
             <div class="ficha-header-top">
                 <button class="btn-volver" onclick="window.location.href='/usuarios'">← Volver</button>
                 <div class="ficha-acciones">
-                    <button class="btn-accion-rapida" id="btn-registrar-ficha" onclick="abrirRegistroFicha()">📝 Registrar</button>
                     <button class="btn-accion-rapida" onclick="abrirEditarFicha()">✏️ Editar</button>
                     <button class="btn-accion-rapida" onclick="abrirCambiarEstadoFicha(event)">🔄 Estado</button>
                 </div>
@@ -73,6 +72,8 @@
                 </div>
 
             </div>
+            <!-- Alerta sesión pendiente del día (se llena dinámicamente desde JS) -->
+            <div id="ficha-alerta-pendiente"></div>
 
             <!-- HISTORIAL CICLOS ANCHO COMPLETO -->
             <div class="ficha-card" style="margin-top:16px;">

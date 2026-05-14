@@ -80,6 +80,64 @@ function renderFicha() {
     }
 
     renderCiclos();
+    // Verificar sesión pendiente del día y mostrar alerta contextual
+    verificarPendienteHoy();
+}
+
+async function verificarPendienteHoy() {
+    const contenedor = document.getElementById('ficha-alerta-pendiente');
+    if (!contenedor) return;
+
+    try {
+        // Consultar detalle-atencion SIN crear ciclo — solo para saber
+        // si hay reserva de hoy con sesion_id_activa
+        const res = await fetch(`${API}/usuarios/detalle-atencion/${usuarioId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Consultar pendientes del dashboard y filtrar por este usuario
+        const resPend = await fetch(`${API}/dashboard/sesiones-pendientes`);
+        if (!resPend.ok) return;
+        const pendientes = await resPend.json();
+
+        const hoy = new Date().toISOString().split('T')[0];
+        const pendientesUsuario = pendientes.filter(p => p.usuario_id === parseInt(usuarioId));
+        const pendientesHoy = pendientesUsuario.filter(p => p.fecha === hoy);
+        const pendientesAnteriores = pendientesUsuario.filter(p => p.fecha < hoy);
+
+        if (pendientesHoy.length === 0 && pendientesAnteriores.length === 0) {
+            contenedor.innerHTML = '';
+            return;
+        }
+
+        let mensaje = '';
+        let color = '';
+        if (pendientesHoy.length > 0 && pendientesAnteriores.length > 0) {
+            mensaje = `⚠️ <strong>Sesión de hoy pendiente</strong> y ${pendientesAnteriores.length} sesión${pendientesAnteriores.length > 1 ? 'es' : ''} anterior${pendientesAnteriores.length > 1 ? 'es' : ''} sin registrar`;
+            color = { bg: '#fef9c3', border: '#fde047', texto: '#854d0e' };
+        } else if (pendientesHoy.length > 0) {
+            mensaje = `⚠️ <strong>Sesión de hoy pendiente de registro</strong>`;
+            color = { bg: '#fef9c3', border: '#fde047', texto: '#854d0e' };
+        } else {
+            mensaje = `🕐 <strong>${pendientesAnteriores.length} sesión${pendientesAnteriores.length > 1 ? 'es anteriores' : ' anterior'} sin registrar</strong>`;
+            color = { bg: '#fff7ed', border: '#fed7aa', texto: '#9a3412' };
+        }
+
+        contenedor.innerHTML = `
+            <div style="
+                background:${color.bg}; border:1px solid ${color.border};
+                border-radius:8px; padding:10px 14px;
+                display:flex; align-items:center; justify-content:space-between;
+                gap:10px; margin-bottom:12px;">
+                <span style="font-size:0.85rem; color:${color.texto};">${mensaje}</span>
+                <button class="btn-accion-mini"
+                        style="background:${color.texto}; color:#fff; border-color:${color.texto}; white-space:nowrap;"
+                        onclick="abrirRegistroFicha()">
+                    📝 Registrar
+                </button>
+            </div>
+        `;
+    } catch (e) {}
 }
 
 // ==========================================
@@ -102,10 +160,34 @@ function renderCiclos() {
         divCiclos.innerHTML = `
             <div style="text-align:center; padding:30px; color:#94a3b8;">
                 <div style="font-size:2rem; margin-bottom:8px;">📋</div>
-                <p style="font-size:0.85rem;">Sin ciclos registrados</p>
+                <p style="font-size:0.85rem; margin-bottom:16px;">Sin ciclos registrados</p>
+                <button class="btn-accion-mini"
+                        style="background:#2563eb; color:#fff; border-color:#2563eb; padding:8px 16px; font-size:0.85rem;"
+                        onclick="abrirRegistroFicha()">
+                    ✨ Iniciar primer ciclo
+                </button>
             </div>
         `;
         return;
+    }
+
+    // Si todos los ciclos están cerrados o eliminados, mostrar botón nuevo ciclo
+    const cicloActivo = fichaData.ciclos.find(c => c.estado === 'activo');
+    if (!cicloActivo) {
+        const divNuevoCiclo = document.createElement('div');
+        divNuevoCiclo.style.cssText = 'text-align:center; padding:16px; border-top:1px solid #e2e8f0; margin-top:8px;';
+        divNuevoCiclo.innerHTML = `
+            <button class="btn-accion-mini"
+                    style="background:#2563eb; color:#fff; border-color:#2563eb; padding:8px 16px; font-size:0.85rem;"
+                    onclick="abrirRegistroFicha()">
+                ✨ Iniciar nuevo ciclo
+            </button>
+        `;
+        // Se agrega después de renderizar los ciclos
+        setTimeout(() => {
+            const ficha = document.getElementById('ficha-ciclos');
+            if (ficha) ficha.appendChild(divNuevoCiclo);
+        }, 0);
     }
 
     if (vistaHistorial === 'compacta') {
@@ -137,6 +219,9 @@ function renderCiclosCompacta(contenedor) {
                         <span style="color:#64748b; font-size:0.82rem;">${c.numero_sesiones} sesiones</span>
                         <button class="btn-accion-mini" style="background:#dbeafe; color:#2563eb; border-color:#bfdbfe;"
                                 onclick="registrarSesionCiclo(${c.id})">📝 Registrar</button>
+                        ${c.estado === 'activo' ? `
+                        <button class="btn-accion-mini" style="background:#fff1f2; color:#e11d48; border-color:#fecdd3;"
+                                onclick="registrarInasistenciaCiclo(${c.id}, ${fichaData.id})">❌ Inasistencia</button>` : ''}
                         <button class="btn-accion-mini" id="btn-eliminar-ciclo-${c.id}"
                                 style="background:#fff1f2; color:#e11d48; border-color:#fecdd3;"
                                 onclick="toggleModoEliminacion(${c.id})">🗑️ Eliminar</button>
@@ -465,7 +550,20 @@ async function abrirModalIngreso() {
     let anamnesis = null;
     try {
         const res = await fetch(`${API}/anamnesis/ciclo/${sesionData.ciclo_id}`);
-        if (res.ok) anamnesis = await res.json();
+        if (res.ok) {
+            anamnesis = await res.json();
+            if (anamnesis) {
+                document.getElementById('ing-motivo').value = anamnesis.motivo_consulta || '';
+                document.getElementById('ing-antecedentes').value = anamnesis.antecedentes || '';
+                document.getElementById('ing-expectativas').value = anamnesis.expectativas_tutor || '';
+                document.getElementById('ing-evaluaciones').value = anamnesis.evaluaciones_aplicadas || '';
+                document.getElementById('ing-area-motora').value = anamnesis.area_motora || 'Normal';
+                document.getElementById('ing-area-cognitiva').value = anamnesis.area_cognitiva || 'Normal';
+                document.getElementById('ing-area-sensorial').value = anamnesis.area_sensorial || 'Normal';
+                document.getElementById('ing-area-social').value = anamnesis.area_social || 'Normal';
+                document.getElementById('ing-fotografia').checked = anamnesis.tiene_fotografia || false;
+            }
+        }
     } catch (e) {}
 
     const tituloHtml = `
@@ -942,15 +1040,18 @@ async function abrirModalIngresoPendiente(cicloId, reservaId, nuevoCiclo = false
             const res = await fetch(`${API}/anamnesis/ciclo/${cicloAnterior.id}`);
             if (res.ok) {
                 const anamnesis = await res.json();
-                document.getElementById('ing-motivo').value = anamnesis.motivo_consulta || '';
-                document.getElementById('ing-antecedentes').value = anamnesis.antecedentes || '';
-                document.getElementById('ing-expectativas').value = anamnesis.expectativas_tutor || '';
-                document.getElementById('ing-evaluaciones').value = anamnesis.evaluaciones_aplicadas || '';
-                document.getElementById('ing-area-motora').value = anamnesis.area_motora || 'Normal';
-                document.getElementById('ing-area-cognitiva').value = anamnesis.area_cognitiva || 'Normal';
-                document.getElementById('ing-area-sensorial').value = anamnesis.area_sensorial || 'Normal';
-                document.getElementById('ing-area-social').value = anamnesis.area_social || 'Normal';
-                document.getElementById('ing-fotografia').checked = anamnesis.tiene_fotografia || false;
+                if(anamnesis) {
+                    document.getElementById('ing-motivo').value = anamnesis.motivo_consulta || '';
+                    document.getElementById('ing-antecedentes').value = anamnesis.antecedentes || '';
+                    document.getElementById('ing-expectativas').value = anamnesis.expectativas_tutor || '';
+                    document.getElementById('ing-evaluaciones').value = anamnesis.evaluaciones_aplicadas || '';
+                    document.getElementById('ing-area-motora').value = anamnesis.area_motora || 'Normal';
+                    document.getElementById('ing-area-cognitiva').value = anamnesis.area_cognitiva || 'Normal';
+                    document.getElementById('ing-area-sensorial').value = anamnesis.area_sensorial || 'Normal';
+                    document.getElementById('ing-area-social').value = anamnesis.area_social || 'Normal';
+                    document.getElementById('ing-fotografia').checked = anamnesis.tiene_fotografia || false;
+                }
+                
             }
         } catch (e) {}
     }
@@ -1048,6 +1149,28 @@ function abrirModalInasistencia(sesionId) {
 function cerrarModalInasistencia() {
     document.getElementById('modal-inasistencia').style.display = 'none';
     sesionInasistenciaId = null;
+}
+
+// Registra inasistencia desde la ficha del usuario (Opción C):
+// - Si hay reserva confirmada del usuario para hoy → la vincula y marca como nsp
+// - Si no hay reserva → crea inasistencia libre sin reserva_id
+async function registrarInasistenciaCiclo(cicloId, usuarioId) {
+    if (!confirm("¿Registrar inasistencia para hoy?")) return;
+
+    const res = await fetch(`${API}/sesiones/crear-inasistencia`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ciclo_id: cicloId, usuario_id: usuarioId })
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Error al registrar inasistencia");
+        return;
+    }
+
+    alert("✅ Inasistencia registrada");
+    await cargarFicha();
 }
 
 async function eliminarInasistencia() {
@@ -1163,7 +1286,7 @@ async function guardarIngresoCompleto() {
 // Detecta el tipo de sesión y abre el modal correspondiente
 async function abrirRegistroFicha() {
     try {
-        const res = await fetch(`${API}/usuarios/detalle-atencion/${usuarioId}`);
+        const res = await fetch(`${API}/usuarios/detalle-atencion/${usuarioId}?crear_ciclo=true`);
         if (!res.ok) throw new Error();
         const data = await res.json();
 
@@ -1218,15 +1341,17 @@ async function abrirRegistroFicha() {
                 const resAnam = await fetch(`${API}/anamnesis/ciclo/${cicloId}`);
                 if (resAnam.ok) {
                     const anamnesis = await resAnam.json();
-                    document.getElementById('ing-motivo').value = anamnesis.motivo_consulta || '';
-                    document.getElementById('ing-antecedentes').value = anamnesis.antecedentes || '';
-                    document.getElementById('ing-expectativas').value = anamnesis.expectativas_tutor || '';
-                    document.getElementById('ing-evaluaciones').value = anamnesis.evaluaciones_aplicadas || '';
-                    document.getElementById('ing-area-motora').value = anamnesis.area_motora || 'Normal';
-                    document.getElementById('ing-area-cognitiva').value = anamnesis.area_cognitiva || 'Normal';
-                    document.getElementById('ing-area-sensorial').value = anamnesis.area_sensorial || 'Normal';
-                    document.getElementById('ing-area-social').value = anamnesis.area_social || 'Normal';
-                    document.getElementById('ing-fotografia').checked = anamnesis.tiene_fotografia || false;
+                    if (anamnesis) {
+                        document.getElementById('ing-motivo').value = anamnesis.motivo_consulta || '';
+                        document.getElementById('ing-antecedentes').value = anamnesis.antecedentes || '';
+                        document.getElementById('ing-expectativas').value = anamnesis.expectativas_tutor || '';
+                        document.getElementById('ing-evaluaciones').value = anamnesis.evaluaciones_aplicadas || '';
+                        document.getElementById('ing-area-motora').value = anamnesis.area_motora || 'Normal';
+                        document.getElementById('ing-area-cognitiva').value = anamnesis.area_cognitiva || 'Normal';
+                        document.getElementById('ing-area-sensorial').value = anamnesis.area_sensorial || 'Normal';
+                        document.getElementById('ing-area-social').value = anamnesis.area_social || 'Normal';
+                        document.getElementById('ing-fotografia').checked = anamnesis.tiene_fotografia || false;
+                    }
                 }
             } catch (e) {}
 
@@ -1287,7 +1412,7 @@ async function abrirRegistroFicha() {
 // Registra una nueva sesión para el ciclo especificado
 async function registrarSesionCiclo(cicloId) {
     try {
-        const res = await fetch(`${API}/usuarios/detalle-atencion/${usuarioId}`);
+        const res = await fetch(`${API}/usuarios/detalle-atencion/${usuarioId}?crear_ciclo=true`);
         if (!res.ok) throw new Error();
         const data = await res.json();
 
@@ -1330,14 +1455,16 @@ async function registrarSesionCiclo(cicloId) {
                 const resAnam = await fetch(`${API}/anamnesis/ciclo/${cicloId}`);
                 if (resAnam.ok) {
                     const a = await resAnam.json();
-                    document.getElementById('ing-motivo').value = a.motivo_consulta || '';
-                    document.getElementById('ing-antecedentes').value = a.antecedentes || '';
-                    document.getElementById('ing-expectativas').value = a.expectativas_tutor || '';
-                    document.getElementById('ing-evaluaciones').value = a.evaluaciones_aplicadas || '';
-                    document.getElementById('ing-area-motora').value = a.area_motora || 'Normal';
-                    document.getElementById('ing-area-cognitiva').value = a.area_cognitiva || 'Normal';
-                    document.getElementById('ing-area-sensorial').value = a.area_sensorial || 'Normal';
-                    document.getElementById('ing-area-social').value = a.area_social || 'Normal';
+                    if (a) {
+                        document.getElementById('ing-motivo').value = a.motivo_consulta || '';
+                        document.getElementById('ing-antecedentes').value = a.antecedentes || '';
+                        document.getElementById('ing-expectativas').value = a.expectativas_tutor || '';
+                        document.getElementById('ing-evaluaciones').value = a.evaluaciones_aplicadas || '';
+                        document.getElementById('ing-area-motora').value = a.area_motora || 'Normal';
+                        document.getElementById('ing-area-cognitiva').value = a.area_cognitiva || 'Normal';
+                        document.getElementById('ing-area-sensorial').value = a.area_sensorial || 'Normal';
+                        document.getElementById('ing-area-social').value = a.area_social || 'Normal';
+                    }
                 }
             } catch (e) {}
             modal.style.display = 'flex';
