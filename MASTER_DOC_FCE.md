@@ -9,14 +9,11 @@
 **Estado general:** En desarrollo activo. Estable para uso clínico básico. Fase 0 completada.
 
 **Último punto funcional alcanzado:**
-- Fase 0 completa: todos los bugs críticos resueltos
-- Vista completa con botón 🗑️ eliminar por sesión
-- Alerta contextual de sesiones pendientes (hoy vs días anteriores)
-- Inasistencia registrable desde la ficha (con y sin reserva — Opción C)
-- Botón Estado eliminado de vistas tabla/cards/compacta (solo en ficha)
-- Ciclo se crea SOLO al registrar, nunca al cambiar estado
-- Modal editar usuario funcional desde las 3 vistas de la lista de usuarios
-- Anamnesis y por-reserva devuelven 200+null en vez de 404
+- Fase 0 completa, Fase 1 ítems 1, 1.1, 1.2 y 2 completas
+- Vista completa con header de ciclo activo (Registrar + Inasistencia)
+- ficha_usuario.js refactorizado en 5 módulos bajo static/js/ficha/
+- Preservación de UI (scroll + ciclos abiertos) entre refrescos
+- Eliminación de ciclo completo con doble confirmación + bloqueo por cobros/informes
 
 **Componentes terminados:**
 - Login con JWT simple (localStorage)
@@ -84,12 +81,18 @@ proyecto_fce/
     indicadores.py, anamnesis.py, diagnosticos.py, medicamentos.py
     dashboard.py, finanzas.py, informes.py, bloques_horario.py, reservas.py
   static/
-    css/style.css
-    js/
-      utils.js               ← funciones compartidas (cargar PRIMERO)
-      main.js, registro.js, usuarios.js
-      ficha_usuario.js       ← lógica ficha clínica (~1700 líneas, frágil)
-    fotos/
+  css/style.css
+  js/
+    utils.js                ← funciones compartidas (cargar PRIMERO)
+    main.js, registro.js, usuarios.js
+    ficha_usuario.js        ← placeholder (eliminable, ~14 líneas)
+    ficha/
+      state.js              ← estado global + helpers de preservación UI
+      core.js               ← carga, render, alerta pendientes, cambio estado
+      ciclos.js             ← historial 3 vistas, papelera, eliminación masiva, menú ⠇
+      sesion.js             ← modal sesión normal, inasistencias, flujo registro
+      ingreso.js            ← modal ingreso completo
+  fotos/
   templates/
     _menu.html, login.html, dashboard.html, registro.html, usuarios.html, ficha_usuario.html
     partials/
@@ -250,26 +253,15 @@ PUT  /ciclos/{id}/reabrir           → valida sin ciclo activo paralelo
 
 ### Fase 1 — Próxima sesión
 
-1. **Vista completa: header ciclo con Registrar e Inasistencia**
-   Agregar en renderCiclosCompleta los mismos botones del header que en renderCiclosCompacta.
-   Reutilizar registrarSesionCiclo() y registrarInasistenciaCiclo(). Solo activo en ciclo activo.
+### Fase 1 — En curso
 
-2. **Eliminar ciclo completo (ruta inalcanzable)**
-   Checkbox del ingreso está disabled → eliminarCicloCompleto() nunca se llama.
-   Recomendación: Opción 1 — botón separado "Eliminar ciclo completo" en header del ciclo.
-   Confirmar con el profesional antes de implementar.
-
-3. **Reabrir ciclo cerrado**
-   PUT /ciclos/{id}/reabrir + botón en ciclos cerrados del historial.
-   Validar que no haya otro ciclo activo.
-
-4. **Cierre de ciclo con motivo**
-   Modal: motivo (cumplimiento/abandono/derivacion/otro) + observación + fecha.
-   PUT /ciclos/{id}/cerrar.
-
-5. **Papelera condicional**
-   Esconder botón 🗑️ Papelera cuando no hay sesiones eliminadas.
-
+1.   ✅ Vista completa con header de ciclo (Fase 1 ítem 1)
+1.1. ✅ Refactor de ficha_usuario.js en 5 módulos (Fase 1.1)
+1.2. ✅ Preservación de UI entre refrescos (Fase 1.2)
+2.   ✅ Eliminar ciclo completo (Fase 1 ítem 2) — menú ⠇ + doble confirmación + bloqueo por cobros/informes
+3.   Reabrir ciclo cerrado ← SIGUIENTE
+4.   Cierre de ciclo con motivo
+5.   Papelera condicional (esconder si vacía)
 ### Fase 2 — Mejoras estructurales
 6. Loading states en fetch (evitar doble-click en guardarIngresoCompleto)
 7. Sistema de invalidación de estado en utils.js
@@ -300,6 +292,8 @@ PUT  /ciclos/{id}/reabrir           → valida sin ciclo activo paralelo
 - CSS con clases duplicadas del modal ingreso
 - registrarSesionCiclo() y abrirRegistroFicha() con lógica similar
 - Vistas compacta/completa/papelera en evaluación estética (prioridad: funcionalidad)
+- Menú contextual ⠇: no se reposiciona al redimensionar ventana con el menú abierto.
+  Fix de ~5 líneas (resize listener) cuando moleste.
 
 ---
 
@@ -320,6 +314,22 @@ PUT  /ciclos/{id}/reabrir           → valida sin ciclo activo paralelo
 22. Bug 4: botón ✨ Iniciar primer/nuevo ciclo cuando no hay ciclo activo
 23. Bug 3: vista completa con 🗑️ eliminarSesionDirecta + label inasistencias correcto
 24. **Fase 0 completada y comiteada a GitHub**
+25. Fase 1 ítem 1: vista completa con header de ciclo activo (Registrar + Inasistencia)
+26. Fase 1.1: refactor de ficha_usuario.js (1686 líneas) en 5 módulos bajo
+    static/js/ficha/ (state, core, ciclos, sesion, ingreso). Eliminadas
+    funciones duplicadas (abrirSesion stub, guardarRegistroIngreso v1).
+27. Fase 1.2: preservación de UI entre refrescos.
+    - Helper refrescarFichaPreservandoUI() en state.js (11 callsites migrados)
+    - Set window._ciclosAbiertos para re-expandir ciclos tras refresh
+    - cambiarVistaHistorial async + minHeight inteligente para evitar
+      parpadeo y saltos de scroll cuando el contenido nuevo es más corto
+28. Fase 1 ítem 2: eliminar ciclo completo (hard delete con cascada FK-safe).
+    - GET /ciclos/{id}/resumen-eliminacion (conteos + bloqueadores)
+    - DELETE /ciclos/{id}/eliminar reescrito: hard delete real
+    - Bloqueo si hay ingresos vinculados (409) o informes asociados (409)
+    - Reservas vinculadas vuelven a estado "confirmada"
+    - Frontend: menú contextual ⠇ con position:fixed, doble confirmación
+      (confirm con detalles + prompt escribir "ELIMINAR CICLO N")
 
 ---
 
@@ -334,49 +344,76 @@ Dev: Mac M1 | uvicorn main:app --reload | venv
 Credenciales: correo@correo.cl / 1234
 
 ## Estado
-- FASE 0 COMPLETA (bugs 1-7 cerrados, comiteados a GitHub)
-- Soft delete + papelera + etiqueta recuperada (C2)
-- Inasistencia desde ficha (Opción C)
-- Alerta contextual pendientes (hoy/anteriores/ninguno)
-- Botón iniciar primer/nuevo ciclo cuando no hay ciclo activo
-- Vista completa con 🗑️ eliminar por sesión
-- Estado usuario solo visual, no crea ciclos
-- detalle-atencion con ?crear_ciclo=true (solo flujo Registrar)
+- FASE 0 COMPLETA (bugs 1-7, comiteados a GitHub)
+- FASE 1 ÍTEMS 1, 1.1, 1.2, 2 COMPLETOS:
+  - Vista completa con header de ciclo activo (Registrar + Inasistencia)
+  - Refactor de ficha_usuario.js → 5 módulos en static/js/ficha/
+    (state, core, ciclos, sesion, ingreso)
+  - Preservación de UI: scroll + ciclos abiertos + minHeight inteligente
+    Helper refrescarFichaPreservandoUI() en state.js
+  - Eliminación de ciclo completo: hard delete + cascada FK-safe +
+    bloqueo por cobros/informes + doble confirmación
+    Menú contextual ⠇ pensado para crecer (ítems 3 y 4 sumarán opciones)
 
 ## FASE 1 — Próxima sesión (en orden)
 
-1. Vista completa: agregar header de ciclo con Registrar e Inasistencia
-   → renderCiclosCompleta en ficha_usuario.js
-   → mismos botones que renderCiclosCompacta
-   → reutilizar registrarSesionCiclo() y registrarInasistenciaCiclo()
-   → Subir ficha_usuario.js al iniciar
-
-2. Eliminar ciclo completo (decisión: Opción 1 botón separado)
-   → confirmar con profesional antes de implementar
-
 3. Reabrir ciclo cerrado
-   → PUT /ciclos/{id}/reabrir
-   → Subir ciclos.py al implementar
+   → Backend: PUT /ciclos/{id}/reabrir
+   → Validar: no permitir si ya hay otro ciclo activo del mismo usuario
+   → Frontend: agregar opción "🔓 Reabrir ciclo" al menú ⠇
+     SOLO en ciclos con estado='cerrado'
+   → Decidir: ¿qué pasa con campos fecha_cierre, motivo_cierre,
+     observacion_cierre al reabrir? ¿Se limpian o se conservan como historial?
 
 4. Cierre de ciclo con motivo
-   → PUT /ciclos/{id}/cerrar
-   → modal: motivo + observación + fecha
+   → Backend: PUT /ciclos/{id}/cerrar
+   → Modal nuevo: motivo (cumplimiento/abandono/derivacion/otro) +
+     observación + fecha_cierre
+   → Frontend: agregar opción "📋 Cerrar ciclo" al menú ⠇
+     SOLO en ciclos con estado='activo'
+   → Modelo Ciclo ya tiene los campos (fecha_cierre, motivo_cierre,
+     observacion_cierre, nullable) — no requiere recrear BD
 
-5. Papelera condicional (esconder si vacía)
+5. Papelera condicional (esconder botón si está vacía)
+   → ~10 líneas: condicionar visibilidad del botón "🗑️ Papelera"
+     según si hay alguna sesión con eliminado=True para algún ciclo del usuario
 
-## Advertencias críticas
-- ficha_usuario.js ~1700 líneas → node --check después de CADA edición
-- utils.js carga ANTES del script específico en cada HTML
+## Archivos clave a tener presente al iniciar
+
+- /static/js/ficha/state.js   (estado global, helpers)
+- /static/js/ficha/core.js    (carga inicial, render ficha)
+- /static/js/ficha/ciclos.js  (historial, menú ⠇) ← más tocado
+- /routers/ciclos.py          (DELETE /eliminar, GET /resumen-eliminacion)
+
+## Advertencias críticas (mantener)
+
+- Cada módulo de ficha/ <520 líneas: si crece mucho, redistribuir
+- node --check después de CADA edición a ficha/*.js
+- utils.js carga PRIMERO, después state.js, después el resto en orden
 - detalle-atencion SIN ?crear_ciclo=true NO crea ciclo (solo consulta)
 - Al cambiar models.py → recrear BD completa
 - No agregar nuevos profesional_id=1 hardcodeados
+- refrescarFichaPreservandoUI() en lugar de cargarFicha() cuando
+  el usuario ya está en la página
+- Subir versiones ?v=N en ficha_usuario.html ante cambios de JS
+- Hard delete real en /ciclos/{id}/eliminar: orden FK-safe estricto
+  (evaluaciones → indicadores → objetivos → anamnesis → sesiones → ciclo)
 
 ## NO replantear
+
 - Stack completo (FastAPI/SQLAlchemy/SQLite/Jinja2/vanilla JS)
-- Soft delete 30 días | Numeración dinámica | utils.js central
+- Soft delete 30 días de sesiones individuales | Numeración dinámica | utils.js central
 - Opción C inasistencias | Opción C2 etiqueta recuperada
 - crear_ciclo param en detalle-atencion
 - Estado usuario = solo visual
 - 200+null para recursos opcionales (anamnesis, por-reserva)
+- Hard delete real (Camino B) para eliminación de ciclo
+- Bloqueo defensivo: ciclo con cobros o informes NO se elimina
+- Menú contextual ⠇ es el lugar para acciones administrativas del ciclo
 - Horizonte SaaS/multiprofesional: LEJANO (>6 meses)
-```
+
+## Deuda técnica menor (no urgente)
+
+- Menú ⠇ no se reposiciona al redimensionar ventana con menú abierto
+- ficha_usuario.js queda como placeholder de 14 líneas (eliminable a futuro)
+- Diagnósticos/medicamentos en modal ingreso no reutilizan utils.js completamente
