@@ -93,7 +93,12 @@ class CicloRespuesta(BaseModel):
     profesional_id: int
     fecha_inicio: date
     numero_sesiones: int
+    sesiones_planificadas: Optional[int] = None
     estado: str
+    # Campos de cierre (nullable: solo presentes si el ciclo fue cerrado alguna vez)
+    fecha_cierre: Optional[date] = None
+    motivo_cierre: Optional[str] = None
+    observacion_cierre: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -269,3 +274,15 @@ class AnamnesisRespuesta(BaseModel):
 
     class Config:
         from_attributes = True
+
+# ===========================================
+# Schemas de cierre y plan de ciclo (Fase 1 ítem 4)
+# ===========================================
+
+class CicloCerrar(BaseModel):
+    motivo: str  # cumplimiento | alta_terapeutica | derivacion | traslado | abandono | otro
+    fecha_cierre: date
+    observacion: Optional[str] = None
+
+class CicloActualizarPlan(BaseModel):
+    sesiones_planificadas: Optional[int] = None  # None = borrar el plan

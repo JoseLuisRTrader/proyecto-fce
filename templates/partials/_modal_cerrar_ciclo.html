@@ -1,0 +1,89 @@
+<div id="modal-cerrar-ciclo" class="modal-overlay">
+        <div class="modal-content" style="max-width: 560px; width: 95%; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2 id="cerrar-ciclo-titulo">📋 Cerrar ciclo</h2>
+                <button class="btn-close" onclick="cerrarModalCerrarCiclo()">&times;</button>
+            </div>
+
+            <!-- PANEL RESUMEN DEL CICLO -->
+            <div id="cerrar-ciclo-resumen" style="
+                background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;
+                padding:14px 16px; margin-bottom:18px; font-size:0.88rem; color:#334155;">
+                <div style="color:#64748b; font-size:0.8rem; font-weight:600; margin-bottom:8px;">
+                    📊 RESUMEN DEL CICLO
+                </div>
+                <div id="cerrar-ciclo-resumen-datos">
+                    <p style="color:#94a3b8; font-size:0.85rem;">Cargando resumen…</p>
+                </div>
+            </div>
+
+            <!-- MOTIVO DE CIERRE -->
+            <div class="form-group">
+                <label style="font-weight:600; color:#1f2937; display:block; margin-bottom:8px;">
+                    Motivo de cierre <span style="color:#dc2626;">*</span>
+                </label>
+                <div id="cerrar-ciclo-motivos" style="display:flex; flex-direction:column; gap:6px;">
+                    <label class="cerrar-ciclo-radio">
+                        <input type="radio" name="cerrar-motivo" value="cumplimiento">
+                        <span>Cumplimiento del plan</span>
+                        <span class="cerrar-ciclo-sugerido" data-motivo="cumplimiento" style="display:none;">sugerido</span>
+                    </label>
+                    <label class="cerrar-ciclo-radio">
+                        <input type="radio" name="cerrar-motivo" value="alta_terapeutica">
+                        <span>Alta terapéutica</span>
+                        <span class="cerrar-ciclo-sugerido" data-motivo="alta_terapeutica" style="display:none;">sugerido</span>
+                    </label>
+                    <label class="cerrar-ciclo-radio">
+                        <input type="radio" name="cerrar-motivo" value="derivacion">
+                        <span>Derivación</span>
+                        <span class="cerrar-ciclo-sugerido" data-motivo="derivacion" style="display:none;">sugerido</span>
+                    </label>
+                    <label class="cerrar-ciclo-radio">
+                        <input type="radio" name="cerrar-motivo" value="traslado">
+                        <span>Traslado</span>
+                        <span class="cerrar-ciclo-sugerido" data-motivo="traslado" style="display:none;">sugerido</span>
+                    </label>
+                    <label class="cerrar-ciclo-radio">
+                        <input type="radio" name="cerrar-motivo" value="abandono">
+                        <span>Abandono</span>
+                        <span class="cerrar-ciclo-sugerido" data-motivo="abandono" style="display:none;">sugerido</span>
+                    </label>
+                    <label class="cerrar-ciclo-radio">
+                        <input type="radio" name="cerrar-motivo" value="otro">
+                        <span>Otro</span>
+                        <span class="cerrar-ciclo-sugerido" data-motivo="otro" style="display:none;">sugerido</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- FECHA DE CIERRE -->
+            <div class="form-group" style="margin-top:14px;">
+                <label style="font-weight:600; color:#1f2937;">
+                    Fecha de cierre <span style="color:#dc2626;">*</span>
+                </label>
+                <input type="date" id="cerrar-ciclo-fecha"
+                    style="padding:10px; border:1px solid #d1d5db; border-radius:8px; font-size:0.9rem;">
+            </div>
+
+            <!-- OBSERVACIÓN -->
+            <div class="form-group" style="margin-top:14px;">
+                <label style="font-weight:600; color:#1f2937;">
+                    Observación <span style="font-size:0.78rem; color:#94a3b8; font-weight:400;">(opcional)</span>
+                </label>
+                <textarea id="cerrar-ciclo-observacion" rows="3"
+                    placeholder="Notas clínicas sobre el cierre del ciclo…"
+                    style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; resize:vertical; font-size:0.9rem;"></textarea>
+            </div>
+
+            <!-- ACCIONES -->
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn-secondary" style="flex:1;" onclick="cerrarModalCerrarCiclo()">
+                    Cancelar
+                </button>
+                <button class="btn-primary" style="flex:1; background:#dc2626;"
+                    onclick="confirmarCerrarCiclo()">
+                    📋 Cerrar ciclo
+                </button>
+            </div>
+        </div>
+    </div>

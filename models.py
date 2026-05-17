@@ -57,17 +57,17 @@ class Ciclo(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     profesional_id = Column(Integer, ForeignKey("profesionales.id"))
     fecha_inicio = Column(Date)
-    fecha_cierre = Column(Date, nullable=True)        # ← nuevo
+    fecha_cierre = Column(Date, nullable=True)
     numero_sesiones = Column(Integer, default=0)
+    sesiones_planificadas = Column(Integer, nullable=True)  # ← NUEVO: meta del plan
     estado = Column(String, default="activo")
-    motivo_cierre = Column(String, nullable=True)     # ← nuevo
-    observacion_cierre = Column(Text, nullable=True)  # ← nuevo
+    motivo_cierre = Column(String, nullable=True)
+    observacion_cierre = Column(Text, nullable=True)
 
     usuario = relationship("Usuario", back_populates="ciclos")
     objetivos = relationship("Objetivo", back_populates="ciclo")
     sesiones = relationship("Sesion", back_populates="ciclo")
     anamnesis = relationship("Anamnesis", back_populates="ciclo", uselist=False)
-
 class Objetivo(Base):
     __tablename__ = "objetivos"
     id = Column(Integer, primary_key=True, index=True)

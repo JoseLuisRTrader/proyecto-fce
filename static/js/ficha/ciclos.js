@@ -4,11 +4,32 @@
 // Provee: renderCiclos (usado desde core.js#renderFicha),
 //         cambiarVistaHistorial, toggleCiclo (usado desde HTML y otros módulos)
 // ===========================================
+// ===========================================
+// Helper: formato de progreso de sesiones del ciclo
+// Sin plan:        "5 sesiones"
+// Con plan:        "5/12 sesiones"
+// Plan completo:   "12/12 sesiones ✓"
+// Plan excedido:   "13/12 sesiones ⚠️"
+// ===========================================
+function formatearProgresoCiclo(ciclo) {
+    const realizadas = ciclo.numero_sesiones || 0;
+    const plan = ciclo.sesiones_planificadas;
+
+    if (!plan) {
+        return `${realizadas} sesiones`;
+    }
+    if (realizadas > plan) {
+        return `${realizadas}/${plan} sesiones ⚠️`;
+    }
+    if (realizadas === plan) {
+        return `${realizadas}/${plan} sesiones ✓`;
+    }
+    return `${realizadas}/${plan} sesiones`;
+}
 
 // ==========================================
 // HISTORIAL DE CICLOS
 // ==========================================
-
 async function cambiarVistaHistorial(vista) {
     // Capturar estado UI antes de re-renderizar.
     const snapshot = capturarEstadoUI();
@@ -123,15 +144,16 @@ function renderCiclosCompacta(contenedor) {
                         <span class="estado-badge" style="background:${estadoColor}20; color:${estadoColor}; font-size:0.75rem;">
                             ${estadoLabel}
                         </span>
-                        <span style="color:#64748b; font-size:0.82rem;">${c.numero_sesiones} sesiones</span>
+                        <span style="color:#64748b; font-size:0.82rem;">${formatearProgresoCiclo(c)}</span>
+                        ${c.estado === 'activo' ? `
                         <button class="btn-accion-mini" style="background:#dbeafe; color:#2563eb; border-color:#bfdbfe;"
                                 onclick="registrarSesionCiclo(${c.id})">📝 Registrar</button>
-                        ${c.estado === 'activo' ? `
                         <button class="btn-accion-mini" style="background:#fff1f2; color:#e11d48; border-color:#fecdd3;"
                                 onclick="registrarInasistenciaCiclo(${c.id}, ${fichaData.id})">❌ Inasistencia</button>` : ''}
+                        ${c.estado === 'activo' ? `
                         <button class="btn-accion-mini" id="btn-eliminar-ciclo-${c.id}"
                                 style="background:#fff1f2; color:#e11d48; border-color:#fecdd3;"
-                                onclick="toggleModoEliminacion(${c.id})">🗑️ Eliminar</button>
+                                onclick="toggleModoEliminacion(${c.id})">🗑️ Eliminar</button>` : ''}
                         <button class="btn-accion-mini btn-menu-ciclo"
                                 onclick="abrirMenuCiclo(event, ${c.id}, ${numCiclo})"
                                 title="Más opciones">⠇</button>
@@ -531,35 +553,59 @@ function abrirMenuCiclo(event, cicloId, numeroCiclo) {
     const existente = document.getElementById('menu-ciclo-popup');
     if (existente) { existente.remove(); return; }
 
-    const menu = document.createElement('div');
-    menu.id = 'menu-ciclo-popup';
-    menu.className = 'menu-ciclo-popup';
-    menu.innerHTML = `
+    // Buscar el ciclo en fichaData para decidir qué opciones mostrar
+    const ciclo = fichaData.ciclos.find(c => c.id === cicloId);
+    const estado = ciclo ? ciclo.estado : null;
+
+    // Construir opciones según estado
+    const opciones = [];
+    if (estado === 'activo') {
+        opciones.push(`
+            <div class="menu-ciclo-opcion"
+                 onclick="abrirModalCerrarCiclo(${cicloId}, ${numeroCiclo})">
+                📋 Cerrar ciclo
+            </div>
+        `);
+    }
+    if (estado === 'cerrado') {
+        opciones.push(`
+            <div class="menu-ciclo-opcion"
+                 onclick="abrirModalVerCierre(${cicloId}, ${numeroCiclo})">
+                👁 Ver cierre
+            </div>
+        `);
+        opciones.push(`
+            <div class="menu-ciclo-opcion"
+                 onclick="solicitarReabrirCiclo(${cicloId}, ${numeroCiclo})">
+                🔓 Reabrir ciclo
+            </div>
+        `);
+    }
+    opciones.push(`
         <div class="menu-ciclo-opcion menu-ciclo-peligro"
              onclick="solicitarEliminacionCicloCompleto(${cicloId}, ${numeroCiclo})">
             ⛔ Eliminar ciclo completo
         </div>
-    `;
+    `);
+
+    const menu = document.createElement('div');
+    menu.id = 'menu-ciclo-popup';
+    menu.className = 'menu-ciclo-popup';
+    menu.innerHTML = opciones.join('');
     document.body.appendChild(menu);
 
-    // Posicionar con position:fixed (relativo al viewport, no al documento).
-    // Mismo patrón que dropdown-estado que ya funciona en el proyecto.
-    // Medimos el menú DESPUÉS de appendChild para conocer su ancho real.
+    // Posicionar con position:fixed (mismo patrón que ítem 2)
     const rectBoton = event.target.getBoundingClientRect();
     const anchoMenu = menu.offsetWidth;
     const altoMenu = menu.offsetHeight;
     const margen = 8;
 
-    // Alinear borde derecho del menú con borde derecho del botón.
     let left = rectBoton.right - anchoMenu;
-    // Si quedaría fuera del viewport por la izquierda, pegarlo al borde con margen.
     if (left < margen) left = margen;
-    // Si quedaría fuera del viewport por la derecha (caso raro), idem.
     if (left + anchoMenu > window.innerWidth - margen) {
         left = window.innerWidth - anchoMenu - margen;
     }
 
-    // Mostrar debajo del botón. Si no entra abajo, mostrar arriba.
     let top = rectBoton.bottom + 4;
     if (top + altoMenu > window.innerHeight - margen) {
         top = rectBoton.top - altoMenu - 4;
@@ -568,7 +614,6 @@ function abrirMenuCiclo(event, cicloId, numeroCiclo) {
     menu.style.top = `${top}px`;
     menu.style.left = `${left}px`;
 
-    // Cerrar al hacer clic fuera (siguiente tick para no auto-cerrar)
     setTimeout(() => {
         document.addEventListener('click', () => {
             const m = document.getElementById('menu-ciclo-popup');
@@ -650,5 +695,272 @@ async function solicitarEliminacionCicloCompleto(cicloId, numeroCiclo) {
         await refrescarFichaPreservandoUI();
     } catch (e) {
         alert("❌ Error de conexión al eliminar el ciclo.");
+    }
+}
+
+// Reabrir ciclo cerrado: confirmación simple + llamada al backend.
+// No requiere prompt() porque la acción es completamente reversible
+// (basta con cerrar de nuevo el ciclo desde la opción "📋 Cerrar ciclo"
+// que se implementará en el ítem 4).
+async function solicitarReabrirCiclo(cicloId, numeroCiclo) {
+    // Cerrar el menú contextual
+    const m = document.getElementById('menu-ciclo-popup');
+    if (m) m.remove();
+
+    const ciclo = fichaData.ciclos.find(c => c.id === cicloId);
+    if (!ciclo) {
+        alert("❌ No se encontró el ciclo. Recarga la página.");
+        return;
+    }
+
+    // Construir mensaje contextual
+    const partes = [
+        `🔓 REABRIR CICLO ${numeroCiclo}`,
+        '',
+        'El ciclo volverá a estado "Activo" y podrás registrar sesiones nuevamente.'
+    ];
+
+    if (ciclo.fecha_cierre || ciclo.motivo_cierre) {
+        partes.push('');
+        partes.push('La información del cierre previo se conservará como historial clínico:');
+        if (ciclo.fecha_cierre)  partes.push(`• Fecha de cierre: ${ciclo.fecha_cierre}`);
+        if (ciclo.motivo_cierre) partes.push(`• Motivo: ${ciclo.motivo_cierre}`);
+    }
+
+    partes.push('');
+    partes.push('¿Confirmar reapertura?');
+
+    if (!confirm(partes.join('\n'))) return;
+
+    try {
+        const res = await fetch(`${API}/ciclos/${cicloId}/reabrir`, { method: 'PUT' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(`❌ ${err.detail || 'Error al reabrir el ciclo.'}`);
+            return;
+        }
+
+        const data = await res.json();
+        const mensaje = data.tenia_cierre_previo
+            ? `✅ Ciclo ${numeroCiclo} reabierto.\n\nCierre previo conservado como historial (${data.fecha_cierre_previa}).`
+            : `✅ Ciclo ${numeroCiclo} reabierto correctamente.`;
+        alert(mensaje);
+
+        await refrescarFichaPreservandoUI();
+    } catch (e) {
+        alert("❌ Error de conexión al reabrir el ciclo.");
+    }
+}
+// ===========================================
+// F4 — CIERRE DE CICLO CON MOTIVO
+// ===========================================
+
+// Abre el modal de cierre y carga el panel-resumen desde el backend.
+async function abrirModalCerrarCiclo(cicloId, numeroCiclo) {
+    // Cerrar el menú contextual si está abierto
+    const m = document.getElementById('menu-ciclo-popup');
+    if (m) m.remove();
+
+    const modal = document.getElementById('modal-cerrar-ciclo');
+    modal.dataset.cicloId = cicloId;
+    modal.dataset.numeroCiclo = numeroCiclo;
+    modal.dataset.modoLectura = 'false';
+
+    // Restaurar modo edición (por si el modal quedó en modo lectura antes)
+    document.querySelectorAll('input[name="cerrar-motivo"]').forEach(r => r.disabled = false);
+    document.getElementById('cerrar-ciclo-fecha').disabled = false;
+    document.getElementById('cerrar-ciclo-observacion').disabled = false;
+    restaurarBotonesModalCierre();
+
+    document.getElementById('cerrar-ciclo-titulo').textContent = `📋 Cerrar ciclo ${numeroCiclo}`;
+    // Reset de campos
+    document.querySelectorAll('input[name="cerrar-motivo"]').forEach(r => r.checked = false);
+    document.querySelectorAll('.cerrar-ciclo-sugerido').forEach(s => s.style.display = 'none');
+    document.getElementById('cerrar-ciclo-observacion').value = '';
+    document.getElementById('cerrar-ciclo-fecha').value = new Date().toISOString().split('T')[0];
+    document.getElementById('cerrar-ciclo-resumen-datos').innerHTML =
+        '<p style="color:#94a3b8; font-size:0.85rem;">Cargando resumen…</p>';
+
+    modal.style.display = 'flex';
+
+    // Cargar resumen del ciclo
+    try {
+        const res = await fetch(`${API}/ciclos/${cicloId}/resumen-cierre`);
+        if (!res.ok) throw new Error("Error cargando resumen");
+        const r = await res.json();
+        renderResumenCierre(r);
+
+        // Preseleccionar motivo sugerido (Decisión 1: opción A)
+        if (r.motivo_sugerido) {
+            const radio = document.querySelector(
+                `input[name="cerrar-motivo"][value="${r.motivo_sugerido}"]`
+            );
+            if (radio) radio.checked = true;
+            const badge = document.querySelector(
+                `.cerrar-ciclo-sugerido[data-motivo="${r.motivo_sugerido}"]`
+            );
+            if (badge) badge.style.display = 'inline-block';
+        }
+    } catch (e) {
+        document.getElementById('cerrar-ciclo-resumen-datos').innerHTML =
+            '<p style="color:#dc2626; font-size:0.85rem;">No se pudo cargar el resumen. Podés cerrar el ciclo igualmente.</p>';
+    }
+}
+
+// Pinta el panel-resumen con los datos del backend.
+function renderResumenCierre(r) {
+    const fila = (label, valor) => `
+        <div style="display:flex; justify-content:space-between; padding:3px 0;">
+            <span style="color:#64748b;">${label}</span>
+            <b style="color:#1e293b;">${valor}</b>
+        </div>`;
+
+    let progreso = '—';
+    if (r.sesiones_planificadas) {
+        const pct = r.progreso_porcentaje != null ? ` (${r.progreso_porcentaje}%)` : '';
+        progreso = `${r.sesiones_realizadas}/${r.sesiones_planificadas}${pct}`;
+    } else {
+        progreso = `${r.sesiones_realizadas} (sin plan definido)`;
+    }
+
+    const dur = r.duracion_dias != null ? `${r.duracion_dias} días` : '—';
+
+    document.getElementById('cerrar-ciclo-resumen-datos').innerHTML =
+        fila('Iniciado', r.fecha_inicio || '—') +
+        fila('Duración', dur) +
+        fila('Sesiones realizadas', r.sesiones_realizadas) +
+        fila('Sesiones planificadas', r.sesiones_planificadas != null ? r.sesiones_planificadas : 'No definido') +
+        fila('Inasistencias', r.inasistencias) +
+        fila('Progreso', progreso);
+}
+
+// Restaura los botones del modal a su estado de modo-cierre (edición).
+// Necesario porque el modo lectura oculta "Cerrar ciclo" y renombra "Cancelar".
+function restaurarBotonesModalCierre() {
+    const modal = document.getElementById('modal-cerrar-ciclo');
+    const botones = modal.querySelectorAll('.modal-content > div:last-child button');
+    if (botones.length >= 2) {
+        botones[0].textContent = 'Cancelar';
+        botones[1].style.display = '';
+    }
+}
+
+// ===========================================
+// Tema 3 — Ver cierre de ciclo (modo solo lectura)
+// Reutiliza el modal de cierre, deshabilitado, mostrando los
+// datos guardados del cierre (motivo, fecha, observación).
+// ===========================================
+async function abrirModalVerCierre(cicloId, numeroCiclo) {
+    const m = document.getElementById('menu-ciclo-popup');
+    if (m) m.remove();
+
+    const modal = document.getElementById('modal-cerrar-ciclo');
+    modal.dataset.cicloId = cicloId;
+    modal.dataset.numeroCiclo = numeroCiclo;
+    modal.dataset.modoLectura = 'true';
+
+    document.getElementById('cerrar-ciclo-titulo').textContent =
+        `📋 Cierre del ciclo ${numeroCiclo}`;
+
+    // Reset visual + restaurar a editable primero (limpia estado previo)
+    document.querySelectorAll('input[name="cerrar-motivo"]').forEach(r => {
+        r.checked = false;
+        r.disabled = false;
+    });
+    document.querySelectorAll('.cerrar-ciclo-sugerido').forEach(s => s.style.display = 'none');
+    document.getElementById('cerrar-ciclo-fecha').disabled = false;
+    document.getElementById('cerrar-ciclo-observacion').disabled = false;
+    document.getElementById('cerrar-ciclo-observacion').value = '';
+    document.getElementById('cerrar-ciclo-fecha').value = '';
+    document.getElementById('cerrar-ciclo-resumen-datos').innerHTML =
+        '<p style="color:#94a3b8; font-size:0.85rem;">Cargando…</p>';
+    restaurarBotonesModalCierre();
+
+    modal.style.display = 'flex';
+
+    try {
+        const res = await fetch(`${API}/ciclos/${cicloId}/resumen-cierre`);
+        if (!res.ok) throw new Error("Error cargando cierre");
+        const r = await res.json();
+        renderResumenCierre(r);  // reutiliza el helper de F4b
+
+        if (r.motivo_cierre) {
+            const radio = document.querySelector(
+                `input[name="cerrar-motivo"][value="${r.motivo_cierre}"]`
+            );
+            if (radio) radio.checked = true;
+        }
+        if (r.fecha_cierre) {
+            document.getElementById('cerrar-ciclo-fecha').value = r.fecha_cierre;
+        }
+        document.getElementById('cerrar-ciclo-observacion').value =
+            r.observacion_cierre || '';
+    } catch (e) {
+        document.getElementById('cerrar-ciclo-resumen-datos').innerHTML =
+            '<p style="color:#dc2626; font-size:0.85rem;">No se pudo cargar la información del cierre.</p>';
+    }
+
+    // Modo lectura: deshabilitar controles (después de poblarlos)
+    document.querySelectorAll('input[name="cerrar-motivo"]').forEach(r => r.disabled = true);
+    document.getElementById('cerrar-ciclo-fecha').disabled = true;
+    document.getElementById('cerrar-ciclo-observacion').disabled = true;
+
+    // Botones: "Cancelar" pasa a "Cerrar", ocultar "Cerrar ciclo"
+    const botones = modal.querySelectorAll('.modal-content > div:last-child button');
+    if (botones.length >= 2) {
+        botones[0].textContent = 'Cerrar';
+        botones[1].style.display = 'none';
+    }
+}
+
+function cerrarModalCerrarCiclo() {
+    const modal = document.getElementById('modal-cerrar-ciclo');
+    modal.style.display = 'none';
+    modal.dataset.cicloId = '';
+    modal.dataset.numeroCiclo = '';
+}
+
+// Envía el PUT /ciclos/{id}/cerrar. Sin confirm extra (Decisión 2: opción A).
+async function confirmarCerrarCiclo() {
+    const modal = document.getElementById('modal-cerrar-ciclo');
+    const cicloId = parseInt(modal.dataset.cicloId);
+    const numeroCiclo = modal.dataset.numeroCiclo;
+
+    const motivoRadio = document.querySelector('input[name="cerrar-motivo"]:checked');
+    const fecha = document.getElementById('cerrar-ciclo-fecha').value;
+    const observacion = document.getElementById('cerrar-ciclo-observacion').value.trim();
+
+    // Validaciones mínimas
+    if (!motivoRadio) {
+        alert("⚠️ Seleccioná un motivo de cierre.");
+        return;
+    }
+    if (!fecha) {
+        alert("⚠️ Indicá la fecha de cierre.");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API}/ciclos/${cicloId}/cerrar`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                motivo: motivoRadio.value,
+                fecha_cierre: fecha,
+                observacion: observacion || null
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(`❌ ${err.detail || 'No se pudo cerrar el ciclo.'}`);
+            return;
+        }
+
+        alert(`✅ Ciclo ${numeroCiclo} cerrado correctamente.`);
+        cerrarModalCerrarCiclo();
+        await refrescarFichaPreservandoUI();
+    } catch (e) {
+        alert("❌ Error de conexión al cerrar el ciclo.");
     }
 }

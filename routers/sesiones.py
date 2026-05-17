@@ -141,15 +141,50 @@ def actualizar_sesion(sesion_id: int, datos: schemas.SesionActualizar, db: Sessi
 def crear_sesion_ingreso(datos: dict, db: Session = Depends(get_db)):
     ciclo_id = datos.get("ciclo_id")
     reserva_id = datos.get("reserva_id")
+    usuario_id = datos.get("usuario_id")  # nuevo: para crear ciclo si hace falta
+
+    # Resolver el ciclo. Si no se pasó ciclo_id (o es inválido),
+    # crear uno nuevo activo para el usuario. Esto evita ciclos
+    # fantasma: el ciclo nace SOLO cuando se guarda el ingreso.
+    ciclo = None
+    if ciclo_id:
+        ciclo = db.query(models.Ciclo).filter(models.Ciclo.id == ciclo_id).first()
+
+    if not ciclo:
+        if not usuario_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Se requiere ciclo_id o usuario_id para crear el ingreso."
+            )
+        # Defensa: no crear un segundo ciclo activo en paralelo
+        ciclo_activo = db.query(models.Ciclo).filter(
+            models.Ciclo.usuario_id == usuario_id,
+            models.Ciclo.estado == "activo"
+        ).first()
+        if ciclo_activo:
+            ciclo = ciclo_activo
+        else:
+            ciclo = models.Ciclo(
+                usuario_id=usuario_id,
+                profesional_id=1,
+                fecha_inicio=date.today(),
+                numero_sesiones=0,
+                estado="activo"
+            )
+            db.add(ciclo)
+            db.flush()  # para obtener ciclo.id sin commitear todavía
+
+    # Si ya hay sesión de ingreso para este ciclo, devolverla (idempotente)
     existente = db.query(models.Sesion).filter(
-        models.Sesion.ciclo_id == ciclo_id,
+        models.Sesion.ciclo_id == ciclo.id,
         models.Sesion.es_ingreso == True,
         models.Sesion.eliminado != True
     ).first()
     if existente:
-        return {"id": existente.id, "creada": False}
+        return {"id": existente.id, "creada": False, "ciclo_id": ciclo.id}
+
     nueva = models.Sesion(
-        ciclo_id=ciclo_id,
+        ciclo_id=ciclo.id,
         reserva_id=reserva_id,
         fecha=date.today(),
         numero_sesion=1,
@@ -158,12 +193,11 @@ def crear_sesion_ingreso(datos: dict, db: Session = Depends(get_db)):
         eliminado=False
     )
     db.add(nueva)
-    ciclo = db.query(models.Ciclo).filter(models.Ciclo.id == ciclo_id).first()
-    if ciclo:
-        ciclo.numero_sesiones += 1
+    ciclo.numero_sesiones += 1
     db.commit()
     db.refresh(nueva)
-    return {"id": nueva.id, "creada": True}
+    return {"id": nueva.id, "creada": True, "ciclo_id": ciclo.id}
+
 
 @router.post("/crear-normal")
 def crear_sesion_normal(datos: dict, db: Session = Depends(get_db)):

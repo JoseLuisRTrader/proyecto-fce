@@ -76,7 +76,8 @@ def obtener_detalle_atencion(usuario_id: int, crear_ciclo: bool = False, db: Ses
         # Contar sesiones reales (excluir inasistencias)
         sesiones_ciclo_count = db.query(models.Sesion).filter(
             models.Sesion.ciclo_id == ciclo_activo.id,
-            models.Sesion.es_inasistencia == False
+            models.Sesion.es_inasistencia == False,
+            models.Sesion.eliminado != True
         ).count()
 
         # CASO 1: Sin ciclos previos y sin sesiones → primer ingreso del sistema
@@ -115,18 +116,11 @@ def obtener_detalle_atencion(usuario_id: int, crear_ciclo: bool = False, db: Ses
                 })
 
     elif not ciclo_activo:
-        if crear_ciclo:
-            nuevo_ciclo = models.Ciclo(
-                usuario_id=usuario_id,
-                profesional_id=1,
-                fecha_inicio=hoy,
-                numero_sesiones=0,
-                estado="activo"
-            )
-            db.add(nuevo_ciclo)
-            db.commit()
-            db.refresh(nuevo_ciclo)
-            ciclo_activo = nuevo_ciclo
+        # Ya NO se crea el ciclo aquí. El ciclo se crea recién al guardar
+        # el ingreso (POST /sesiones/crear-ingreso con usuario_id).
+        # Esto elimina los ciclos fantasma al abrir y cerrar el modal
+        # sin guardar. El parámetro crear_ciclo se mantiene por
+        # compatibilidad de firma pero ya no persiste nada.
         es_primera_sesion = True
         es_inicio_nuevo_ciclo = ciclos_previos > 0
 
@@ -204,6 +198,6 @@ def obtener_ficha_completa(usuario_id: int, db: Session = Depends(get_db)):
         "foto_url": user.foto_url,
         "diagnosticos": [{"id": d.id, "descripcion": d.descripcion, "tipo": d.tipo, "fecha": str(d.fecha) if d.fecha else None} for d in diagnosticos],
         "medicamentos": [{"id": m.id, "nombre": m.nombre, "dosis": m.dosis, "fecha_inicio": str(m.fecha_inicio) if m.fecha_inicio else None, "fecha_fin": str(m.fecha_fin) if m.fecha_fin else None} for m in medicamentos],
-        "ciclos": [{"id": c.id, "fecha_inicio": str(c.fecha_inicio), "numero_sesiones": c.numero_sesiones, "estado": c.estado} for c in ciclos],
+        "ciclos": [{"id": c.id, "fecha_inicio": str(c.fecha_inicio), "numero_sesiones": c.numero_sesiones, "sesiones_planificadas": c.sesiones_planificadas, "estado": c.estado, "fecha_cierre": str(c.fecha_cierre) if c.fecha_cierre else None, "motivo_cierre": c.motivo_cierre} for c in ciclos],        
         "total_sesiones": sum(c.numero_sesiones for c in ciclos)
     }

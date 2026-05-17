@@ -5,7 +5,45 @@
 //   - abrirSesion, registrarSesionCiclo, abrirRegistroFicha → llamados desde HTML/otros módulos
 //   - abrirModalInasistencia, registrarInasistenciaCiclo, eliminarSesionDirecta
 // ===========================================
+// ===========================================
+// Helper F2: línea de progreso del plan para el título del modal de sesión
+//   numeroSesion  → número de la sesión que se está viendo/registrando
+//   cicloId       → id del ciclo (para buscar el plan en fichaData.ciclos)
+//   esNueva       → true si se está registrando una sesión nueva (muestra "quedan X")
+//                    false si se está viendo/editando una existente (sin "quedan")
+// Devuelve string vacío si no hay plan definido (no se muestra nada extra).
+// ===========================================
+function textoProgresoPlanSesion(numeroSesion, cicloId, esNueva) {
+    const ciclo = (fichaData && fichaData.ciclos)
+        ? fichaData.ciclos.find(c => c.id === cicloId)
+        : null;
+    const plan = ciclo ? ciclo.sesiones_planificadas : null;
 
+    if (!plan) {
+        return '';  // sin plan → no se muestra contador "de M"
+    }
+
+    if (numeroSesion > plan) {
+        return `<span class="estado-badge" style="background:#fef3c7; color:#92400e; font-size:0.72rem;">
+                    de ${plan} ⚠️ Superaste el plan
+                </span>`;
+    }
+
+    if (esNueva) {
+        const quedan = plan - numeroSesion;
+        const txtQuedan = quedan > 0
+            ? ` · quedan ${quedan}`
+            : ' · última del plan';
+        return `<span class="estado-badge" style="background:#dcfce7; color:#166534; font-size:0.72rem;">
+                    de ${plan}${txtQuedan}
+                </span>`;
+    }
+
+    // Editando una sesión existente: solo contexto "de M", sin "quedan"
+    return `<span class="estado-badge" style="background:#e0e7ff; color:#3730a3; font-size:0.72rem;">
+                de ${plan}
+            </span>`;
+}
 // ==========================================
 // MODAL SESIÓN NORMAL
 // ==========================================
@@ -50,6 +88,7 @@ function abrirModalSesionNormal() {
             <div style="display:flex; align-items:center; gap:8px;">
                 <span>${sesionData.es_ingreso ? '⭐' : '📝'}</span>
                 <span>Sesión ${sesionData.numero_sesion}</span>
+                ${textoProgresoPlanSesion(sesionData.numero_sesion, sesionData.ciclo_id, false)}
                 <span class="estado-badge" style="background:#dbeafe; color:#2563eb; font-size:0.75rem;">
                     Ciclo ${sesionData.ciclo_numero}
                 </span>
@@ -153,9 +192,11 @@ async function guardarSesion() {
     });
 
     if (res.ok) {
-        alert("✅ Registro guardado correctamente");
+        const cicloIdGuardado = sesionData?.ciclo_id;
         cerrarModalSesion();
         await refrescarFichaPreservandoUI();
+        // F4d: si el ciclo alcanzó/superó su plan, sugerir cerrarlo
+        sugerirCierreSiPlanCompleto(cicloIdGuardado);
     } else {
         alert("Error al guardar el registro");
     }
@@ -378,6 +419,7 @@ async function abrirRegistroFicha() {
                 <div style="display:flex; flex-direction:column; gap:4px;">
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span>📝 Sesión ${data.sesiones_ciclo_actual + 1}</span>
+                        ${textoProgresoPlanSesion(data.sesiones_ciclo_actual + 1, data.ciclo_activo_id, true)}
                         <span class="estado-badge" style="background:#dbeafe; color:#2563eb; font-size:0.75rem;">
                             Ciclo ${fichaData.ciclos.length}
                         </span>
@@ -479,6 +521,7 @@ async function registrarSesionCiclo(cicloId) {
                 <div style="display:flex; flex-direction:column; gap:4px;">
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span>📝 Sesión ${data.sesiones_ciclo_actual + 1}</span>
+                        ${textoProgresoPlanSesion(data.sesiones_ciclo_actual + 1, cicloId, true)}
                         <span class="estado-badge" style="background:#dbeafe; color:#2563eb; font-size:0.75rem;">
                             Ciclo ${fichaData.ciclos.length}
                         </span>
@@ -501,3 +544,41 @@ async function registrarSesionCiclo(cicloId) {
     }
 }
 
+// ===========================================
+// F4d — Sugerencia de cierre al completar el plan
+// Tras guardar una sesión, si el ciclo activo alcanzó o superó
+// sesiones_planificadas, ofrece abrir el modal de cierre con
+// motivo "cumplimiento" preseleccionado (vía resumen-cierre).
+// Aparece una sola vez al cruzar el umbral (no spamea).
+// ===========================================
+async function sugerirCierreSiPlanCompleto(cicloId) {
+    if (!cicloId) return;
+
+    // Releer fichaData ya refrescada para tener el conteo actualizado
+    const ciclo = (fichaData && fichaData.ciclos)
+        ? fichaData.ciclos.find(c => c.id === cicloId)
+        : null;
+    if (!ciclo) return;
+    if (ciclo.estado !== 'activo') return;          // ya cerrado, nada que sugerir
+    if (!ciclo.sesiones_planificadas) return;        // sin plan, no aplica
+
+    const realizadas = ciclo.numero_sesiones || 0;
+    const plan = ciclo.sesiones_planificadas;
+
+    if (realizadas < plan) return;                   // todavía no llegó al plan
+
+    // Numero de ciclo para el texto (mismo cálculo que usa el resto del módulo)
+    const idx = fichaData.ciclos.findIndex(c => c.id === cicloId);
+    const numeroCiclo = fichaData.ciclos.length - idx;
+
+    const mensaje = realizadas > plan
+        ? `Este ciclo superó el plan (${realizadas}/${plan} sesiones).\n\n¿Querés cerrarlo ahora?`
+        : `Este ciclo completó el plan (${realizadas}/${plan} sesiones).\n\n¿Querés cerrarlo ahora con motivo "Cumplimiento del plan"?`;
+
+    if (confirm(`🎯 Plan terapéutico completo\n\n${mensaje}`)) {
+        abrirModalCerrarCiclo(cicloId, numeroCiclo);
+    }
+    // Si elige "Cancelar": no pasa nada. El badge ⚠️/✓ de F1 queda como
+    // recordatorio visual permanente. No se vuelve a preguntar en cada sesión
+    // porque solo se dispara al guardar una sesión nueva que cruza el umbral.
+}

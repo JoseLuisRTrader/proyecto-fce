@@ -1,6 +1,6 @@
 # MASTER_DOC — FCE Project
 > Documentación técnica para continuidad de desarrollo
-> Generado: Mayo 2026 · **Última actualización: Cierre Fase 0 completa**
+> Generado: Mayo 2026 · **Última actualización: Fase 1 ítems 3 y 4 completos**
 
 ---
 
@@ -9,11 +9,16 @@
 **Estado general:** En desarrollo activo. Estable para uso clínico básico. Fase 0 completada.
 
 **Último punto funcional alcanzado:**
-- Fase 0 completa, Fase 1 ítems 1, 1.1, 1.2 y 2 completas
+- Fase 0 completa, Fase 1 ítems 1, 1.1, 1.2, 2, 3 y 4 completas
 - Vista completa con header de ciclo activo (Registrar + Inasistencia)
 - ficha_usuario.js refactorizado en 5 módulos bajo static/js/ficha/
 - Preservación de UI (scroll + ciclos abiertos) entre refrescos
 - Eliminación de ciclo completo con doble confirmación + bloqueo por cobros/informes
+- Reabrir ciclo cerrado (conserva historial de cierre como trazabilidad)
+- Cierre de ciclo con motivo + plan terapéutico (sesiones planificadas,
+  progreso X/Y, sugerencia de cierre al completar plan, ver cierre en lectura)
+- Creación de ciclo lazy: el ciclo nace al guardar el ingreso, no al abrir
+  el modal (elimina ciclos fantasma)
 
 **Componentes terminados:**
 - Login con JWT simple (localStorage)
@@ -32,13 +37,18 @@
 - Alerta pendientes: contextual por fecha (hoy vs anteriores vs sin pendiente)
 - Botón ✨ Iniciar primer/nuevo ciclo cuando no hay ciclo activo
 - Vista completa: botón 🗑️ eliminar por sesión + label correcto de inasistencias
+- Reabrir ciclo cerrado: opción "🔓 Reabrir ciclo" en menú ⠇ (Fase 1, ítem 3)
+- Cierre de ciclo: modal con resumen + motivo + plan terapéutico (Fase 1, ítem 4)
+- Plan terapéutico: campo sesiones_planificadas, progreso X/Y en compacta,
+  "Sesión N de M" en modal registro, input en modal ingreso
+- Ver cierre de ciclo en modo lectura (reusa modal de cierre, menú ⠇)
 
 **Componentes parciales:**
-- Vista completa: falta header de ciclo con botones Registrar e Inasistencia (Fase 1, ítem 1)
-- Eliminar ingreso con advertencia: bloqueado visualmente, ruta inalcanzable (Fase 1, ítem 2)
-- Reabrir ciclo cerrado: NO implementado (Fase 1, ítem 3)
-- Cierre de ciclo con motivo: definido, NO implementado (Fase 1, ítem 4)
 - Sección informes en ficha: definido, NO implementado (Fase 3)
+- Modal cerrar ciclo: panel resumen básico; panel clínico completo
+  (objetivos + indicadores + evolución) pendiente (deuda de diseño post-MVP)
+- CSS modal cerrar ciclo: funcional pero a compactar en reestructuración
+  general de modales (decisión consciente, postergado)
 
 **Componentes no iniciados:**
 - Agenda, Finanzas, Deploy, Pre-informe automático
@@ -131,8 +141,17 @@ class Sesion:
     fecha_creacion: DateTime (default=datetime.now)   # orden estable
     recuperado: bool (default=False)                   # marca temporal post-restauración
 
+# Ciclo: añadido sesiones_planificadas (Integer, nullable) — plan terapéutico
+#   null = sin plan definido; usado por progreso X/Y y sugerencia de cierre
+class Ciclo:
+    id, usuario_id, profesional_id, fecha_inicio
+    numero_sesiones (contador, sincronizado en crear/eliminar/restaurar)
+    sesiones_planificadas: Integer nullable     # meta del plan (ítem 4)
+    estado: 'activo' | 'cerrado'
+    fecha_cierre, motivo_cierre, observacion_cierre (nullable)
+
 # Resto sin cambios relevantes recientes:
-# Profesional, Usuario, BloqueHorario, Reserva, Ciclo
+# Profesional, Usuario, BloqueHorario, Reserva
 # Anamnesis, Objetivo, IndicadorLogro, EvaluacionIndicador
 # Diagnostico, Medicamento, Ingreso, Gasto, Informe
 ```
@@ -143,19 +162,24 @@ class Sesion:
 
 ### detalle-atencion y creación de ciclo
 ```
-GET /usuarios/detalle-atencion/{id}?crear_ciclo=false (default)
-  → Solo consulta. NUNCA crea ciclo.
+GET /usuarios/detalle-atencion/{id}?crear_ciclo=bool
+  → SOLO CONSULTA en todos los casos. NUNCA crea ciclo.
+  → El parámetro crear_ciclo se mantiene por compatibilidad de firma
+    pero a partir del ítem 4 ya NO persiste nada (anti-fantasma).
 
-GET /usuarios/detalle-atencion/{id}?crear_ciclo=true
-  → Crea ciclo activo si no existe. Solo para flujo Registrar.
+Creación de ciclo (LAZY — ítem 4):
+  → El ciclo se crea recién al guardar el ingreso:
+    POST /sesiones/crear-ingreso { usuario_id, ciclo_id?, reserva_id? }
+  → Si no llega ciclo_id válido y no hay ciclo activo del usuario,
+    crear-ingreso crea el ciclo en la misma transacción que la sesión
+    de ingreso. Si ya hay activo, lo reutiliza (no duplica).
+  → Cerrar el modal de ingreso sin guardar = NO se crea nada.
+  → guardarIngresoCompleto reordenado: crear-ingreso es el paso 1,
+    devuelve ciclo_id real; anamnesis/objetivo/plan usan ese id después.
 
-Flujos con ?crear_ciclo=true:
-  - abrirRegistroFicha()
-  - registrarSesionCiclo()
-
-Flujos SIN crear_ciclo (solo consultan):
-  - verificarPendienteHoy()
-  - cualquier consulta de estado o validación
+Flujos que consultan detalle-atencion (sin efecto de creación):
+  - abrirRegistroFicha(), registrarSesionCiclo()
+  - verificarPendienteHoy() y cualquier validación de estado
 ```
 
 ### Estado del usuario
@@ -211,6 +235,8 @@ GET  /usuarios/detalle-atencion/{id}?crear_ciclo=bool
 
 # Sesiones
 POST /sesiones/crear-ingreso        → es_ingreso=True, numero_sesion=1
+                                       acepta usuario_id: crea ciclo lazy
+                                       si no existe (anti-fantasma, ítem 4)
 POST /sesiones/crear-normal         → es_ingreso=False, sesiones 2..N
 POST /sesiones/crear-inasistencia   → Opción C
 PUT  /sesiones/{id}                 → limpia recuperado si True
@@ -224,9 +250,19 @@ GET  /anamnesis/ciclo/{id}          → 200+null (no 404)
 # Dashboard
 GET /dashboard/sesiones-pendientes  → detección dual Caso A + Caso B
 
-# Ciclos (endpoints pendientes de implementar en Fase 1)
-PUT  /ciclos/{id}/cerrar            → motivo + observación + fecha
-PUT  /ciclos/{id}/reabrir           → valida sin ciclo activo paralelo
+# Ciclos (Fase 1 ítems 2, 3, 4 — IMPLEMENTADOS)
+GET    /ciclos                      → CicloRespuesta (campos cierre incl.)
+GET    /ciclos/{id}                 → idem
+GET    /ciclos/usuario/{id}         → lista del usuario
+POST   /ciclos                      → crear
+GET    /ciclos/{id}/resumen-eliminacion → conteos + bloqueadores (ítem 2)
+DELETE /ciclos/{id}/eliminar        → hard delete FK-safe (ítem 2)
+PUT    /ciclos/{id}/reabrir         → estado=activo, conserva cierre (ítem 3)
+PUT    /ciclos/{id}/cerrar          → motivo + fecha + observación (ítem 4)
+PATCH  /ciclos/{id}/plan            → sesiones_planificadas (null=borrar)
+GET    /ciclos/{id}/resumen-cierre  → resumen + motivo/fecha/observación +
+                                       motivo_sugerido (heurística)
+# Nota: prefijo limpio /ciclos/... (doble /ciclos/ciclos eliminado, ítem 4)
 ```
 
 ---
@@ -330,6 +366,35 @@ PUT  /ciclos/{id}/reabrir           → valida sin ciclo activo paralelo
     - Reservas vinculadas vuelven a estado "confirmada"
     - Frontend: menú contextual ⠇ con position:fixed, doble confirmación
       (confirm con detalles + prompt escribir "ELIMINAR CICLO N")
+29. Fase 1 ítem 3: reabrir ciclo cerrado.
+    - PUT /ciclos/{id}/reabrir (valida estado='cerrado' + sin ciclo activo
+      paralelo del mismo usuario, 409)
+    - Conserva fecha_cierre/motivo_cierre/observacion_cierre como historial
+      clínico (decisión: trazabilidad, análogo a Opción C2)
+    - Menú ⠇ renderiza opciones condicionalmente según estado del ciclo
+30. Fase 1 ítem 4: cierre de ciclo con motivo + plan terapéutico.
+    - Modelo: campo sesiones_planificadas (Integer, nullable) → recrear BD
+    - Schemas: CicloCerrar, CicloActualizarPlan; CicloRespuesta ampliado
+      con sesiones_planificadas/fecha_cierre/motivo_cierre/observacion_cierre
+    - Endpoints: PUT /ciclos/{id}/cerrar, PATCH /ciclos/{id}/plan,
+      GET /ciclos/{id}/resumen-cierre (resumen + motivo/fecha/observación)
+    - Catálogo motivos: cumplimiento, alta_terapeutica, derivacion,
+      traslado, abandono, otro
+    - F1: progreso X/Y en vista compacta (helper formatearProgresoCiclo)
+    - F2: "Sesión N de M · quedan X" en header del modal de registro
+    - F3: input sesiones planificadas en modal de ingreso (PATCH al guardar)
+    - F4: modal _modal_cerrar_ciclo.html + opción "📋 Cerrar ciclo" en
+      menú ⠇ (solo activos) + sugerencia de cierre al completar plan
+    - Tema 3: "👁 Ver cierre" en menú ⠇ (solo cerrados), reusa modal en
+      modo lectura; reset de modo en abrirModalCerrarCiclo
+    - Anti-fantasma: ciclo se crea lazy en POST /sesiones/crear-ingreso
+      (acepta usuario_id); detalle-atencion?crear_ciclo ya NO persiste.
+      guardarIngresoCompleto reordenado: crear-ingreso primero
+    - Fix: detalle-atencion contaba sesiones en papelera (eliminado!=True)
+    - Limpieza: doble prefijo /ciclos/ciclos eliminado en routers/ciclos.py
+    - UX: ciclo cerrado en compacta solo muestra ⠇ + flecha (sin Registrar/
+      Inasistencia/Eliminar — para editar hay que reabrir)
+    - Seed: sesiones_planificadas con escenarios variados (Grupo B/C)
 
 ---
 
@@ -345,7 +410,7 @@ Credenciales: correo@correo.cl / 1234
 
 ## Estado
 - FASE 0 COMPLETA (bugs 1-7, comiteados a GitHub)
-- FASE 1 ÍTEMS 1, 1.1, 1.2, 2 COMPLETOS:
+- FASE 1 ÍTEMS 1, 1.1, 1.2, 2, 3, 4 COMPLETOS:
   - Vista completa con header de ciclo activo (Registrar + Inasistencia)
   - Refactor de ficha_usuario.js → 5 módulos en static/js/ficha/
     (state, core, ciclos, sesion, ingreso)
@@ -353,44 +418,51 @@ Credenciales: correo@correo.cl / 1234
     Helper refrescarFichaPreservandoUI() en state.js
   - Eliminación de ciclo completo: hard delete + cascada FK-safe +
     bloqueo por cobros/informes + doble confirmación
-    Menú contextual ⠇ pensado para crecer (ítems 3 y 4 sumarán opciones)
+  - Reabrir ciclo cerrado (ítem 3): conserva historial de cierre
+  - Cierre de ciclo con motivo + plan terapéutico (ítem 4): modal con
+    resumen, sesiones_planificadas, progreso X/Y, "Sesión N de M",
+    sugerencia al completar plan, ver cierre en modo lectura
+  - Anti-fantasma: ciclo se crea lazy al guardar ingreso, no al abrir modal
+  - Menú ⠇ condicional por estado: activo → Cerrar/Eliminar;
+    cerrado → Ver cierre/Reabrir/Eliminar ciclo completo
 
 ## FASE 1 — Próxima sesión (en orden)
-
-3. Reabrir ciclo cerrado
-   → Backend: PUT /ciclos/{id}/reabrir
-   → Validar: no permitir si ya hay otro ciclo activo del mismo usuario
-   → Frontend: agregar opción "🔓 Reabrir ciclo" al menú ⠇
-     SOLO en ciclos con estado='cerrado'
-   → Decidir: ¿qué pasa con campos fecha_cierre, motivo_cierre,
-     observacion_cierre al reabrir? ¿Se limpian o se conservan como historial?
-
-4. Cierre de ciclo con motivo
-   → Backend: PUT /ciclos/{id}/cerrar
-   → Modal nuevo: motivo (cumplimiento/abandono/derivacion/otro) +
-     observación + fecha_cierre
-   → Frontend: agregar opción "📋 Cerrar ciclo" al menú ⠇
-     SOLO en ciclos con estado='activo'
-   → Modelo Ciclo ya tiene los campos (fecha_cierre, motivo_cierre,
-     observacion_cierre, nullable) — no requiere recrear BD
 
 5. Papelera condicional (esconder botón si está vacía)
    → ~10 líneas: condicionar visibilidad del botón "🗑️ Papelera"
      según si hay alguna sesión con eliminado=True para algún ciclo del usuario
 
+## Deuda de diseño post-MVP (cuando se retome, ítem dedicado)
+
+- Modal cerrar ciclo — panel clínico completo: además del resumen básico
+  actual, mostrar plan terapéutico, evaluación del objetivo general y
+  específicos, evolución de indicadores. Backend resumen-cierre ya devuelve
+  objetivos/indicadores/evaluaciones (counts) listos para ampliar.
+- De ahí se alimenta el pre-informe automático por ciclo cerrado (Fase 3)
+- Compactar/reestructurar CSS de modales (incluye _modal_cerrar_ciclo)
+
 ## Archivos clave a tener presente al iniciar
 
 - /static/js/ficha/state.js   (estado global, helpers)
 - /static/js/ficha/core.js    (carga inicial, render ficha)
-- /static/js/ficha/ciclos.js  (historial, menú ⠇) ← más tocado
-- /routers/ciclos.py          (DELETE /eliminar, GET /resumen-eliminacion)
+- /static/js/ficha/ciclos.js  (historial, menú ⠇, cierre/reabrir/ver) ← más tocado
+- /static/js/ficha/ingreso.js (guardarIngresoCompleto, crear-ingreso lazy)
+- /routers/ciclos.py          (cerrar/reabrir/plan/resumen-cierre/eliminar)
+- /routers/sesiones.py        (crear-ingreso con creación lazy de ciclo)
+- /routers/usuarios.py        (detalle-atencion ya NO crea ciclo)
+- /templates/partials/_modal_cerrar_ciclo.html (modo cerrar + modo lectura)
 
 ## Advertencias críticas (mantener)
 
 - Cada módulo de ficha/ <520 líneas: si crece mucho, redistribuir
+  (ciclos.js ya supera esto tras ítem 4: candidato a redistribuir)
 - node --check después de CADA edición a ficha/*.js
+  (silencio = OK; usar `&& echo OK` para confirmación visible)
 - utils.js carga PRIMERO, después state.js, después el resto en orden
 - detalle-atencion SIN ?crear_ciclo=true NO crea ciclo (solo consulta)
+  IMPORTANTE: tras ítem 4, detalle-atencion NUNCA crea ciclo (ni con
+  crear_ciclo=true). El ciclo se crea en POST /sesiones/crear-ingreso
+  (que ahora acepta usuario_id y lo crea lazy si no existe)
 - Al cambiar models.py → recrear BD completa
 - No agregar nuevos profesional_id=1 hardcodeados
 - refrescarFichaPreservandoUI() en lugar de cargarFicha() cuando
@@ -398,6 +470,12 @@ Credenciales: correo@correo.cl / 1234
 - Subir versiones ?v=N en ficha_usuario.html ante cambios de JS
 - Hard delete real en /ciclos/{id}/eliminar: orden FK-safe estricto
   (evaluaciones → indicadores → objetivos → anamnesis → sesiones → ciclo)
+- Endpoints/queries que cuentan sesiones SIEMPRE filtran eliminado != True
+  (papelera no debe contar como sesión realizada)
+- Modal _modal_cerrar_ciclo se usa en 2 modos (cerrar/ver): el reset a
+  modo edición ocurre en abrirModalCerrarCiclo, NO en cerrarModal
+- ciclo_id ≠ usuario_id: al consultar la BD verificar con cuál se filtra
+  (fuente recurrente de confusión en validaciones)
 
 ## NO replantear
 
@@ -410,6 +488,13 @@ Credenciales: correo@correo.cl / 1234
 - Hard delete real (Camino B) para eliminación de ciclo
 - Bloqueo defensivo: ciclo con cobros o informes NO se elimina
 - Menú contextual ⠇ es el lugar para acciones administrativas del ciclo
+- Reabrir conserva motivo/fecha/observación de cierre (trazabilidad)
+- Ciclo se crea lazy al guardar ingreso (NUNCA al abrir modal/consultar)
+- Plan terapéutico: sesiones_planificadas nullable; vacío = "sin plan"
+- Sugerencia de cierre: solo al guardar sesión que cruza el umbral del
+  plan; cancelarla no reaparece (no spamea). NO cierre automático
+- Ciclo cerrado en compacta: solo lectura (⠇ + flecha). Para editar
+  sesiones → reabrir primero
 - Horizonte SaaS/multiprofesional: LEJANO (>6 meses)
 
 ## Deuda técnica menor (no urgente)

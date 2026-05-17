@@ -3,7 +3,61 @@
 // Requiere: utils.js, ficha/state.js, ficha/core.js, ficha/ciclos.js cargados antes
 // Provee: abrirModalIngreso, abrirModalIngresoPendiente, guardarIngresoCompleto, ...
 // ===========================================
+// ===========================================
+// Helper F3: gestión del input "sesiones planificadas"
+// - precargarSesionesPlanificadas: lee el plan actual del ciclo (si existe)
+//   desde fichaData.ciclos y lo pone en el input. Si no hay plan, vacío.
+// - guardarSesionesPlanificadas: envía PATCH /ciclos/{id}/plan con el valor
+//   del input. Vacío → envía null (limpia el plan). Solo PATCHea si cambió.
+// ===========================================
+function precargarSesionesPlanificadas(cicloId) {
+    const input = document.getElementById('ing-sesiones-planificadas');
+    if (!input) return;
 
+    const ciclo = (fichaData && fichaData.ciclos)
+        ? fichaData.ciclos.find(c => c.id === cicloId)
+        : null;
+    const plan = ciclo ? ciclo.sesiones_planificadas : null;
+
+    input.value = (plan !== null && plan !== undefined) ? plan : '';
+    // Guardar valor original para detectar si cambió al guardar
+    input.dataset.valorOriginal = input.value;
+}
+
+async function guardarSesionesPlanificadas(cicloId) {
+    const input = document.getElementById('ing-sesiones-planificadas');
+    if (!input) return;
+
+    const valorActual = input.value.trim();
+    const valorOriginal = (input.dataset.valorOriginal || '').trim();
+
+    // No cambió → no hacer PATCH innecesario
+    if (valorActual === valorOriginal) return;
+
+    let sesionesPlanificadas;
+    if (valorActual === '') {
+        sesionesPlanificadas = null;  // limpiar el plan
+    } else {
+        const n = parseInt(valorActual, 10);
+        if (isNaN(n) || n < 1) {
+            // Valor inválido: avisar y no enviar (no bloquea el resto del ingreso)
+            alert("⚠️ Sesiones planificadas debe ser un número mayor o igual a 1. No se guardó ese campo.");
+            return;
+        }
+        sesionesPlanificadas = n;
+    }
+
+    try {
+        await fetch(`${API}/ciclos/${cicloId}/plan`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sesiones_planificadas: sesionesPlanificadas })
+        });
+    } catch (e) {
+        console.error("Error guardando sesiones planificadas:", e);
+        // No interrumpe el flujo de ingreso: es un dato secundario
+    }
+}
 // ==========================================
 // MODAL INGRESO
 // ==========================================
@@ -82,7 +136,7 @@ async function abrirModalIngreso() {
         if (el) el.style.display = 'block';
     });
     document.querySelectorAll('#modal-ingreso .seccion-badge').forEach(b => b.textContent = '−');
-
+    precargarSesionesPlanificadas(sesionData.ciclo_id);
     modal.style.display = 'flex';
 }
 
@@ -386,6 +440,7 @@ async function abrirModalIngresoPendiente(cicloId, reservaId, nuevoCiclo = false
     document.getElementById('ing-actividades').value = '';
     document.getElementById('ing-materiales').value = '';
     document.getElementById('ing-compromisos').value = '';
+    precargarSesionesPlanificadas(cicloId);
 
     await cargarObjetivosIngreso();
     await cargarDiagnosticosIngreso();
@@ -409,8 +464,13 @@ async function guardarRegistroIngreso() {
         const resCrear = await fetch(`${API}/sesiones/crear-ingreso`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ciclo_id: cicloId, reserva_id: reservaId })
+            body: JSON.stringify({ ciclo_id: cicloId || null, reserva_id: reservaId, usuario_id: parseInt(usuarioId) })
         });
+        const creadaIng = await resCrear.json();
+        // Si el backend creó/resolvió el ciclo, sincronizar el dataset
+        if (creadaIng && creadaIng.ciclo_id) {
+            document.getElementById('modal-ingreso').dataset.cicloId = creadaIng.ciclo_id;
+        }
         const creada = await resCrear.json();
         sesionActivaId = creada.id;
     }
@@ -446,16 +506,43 @@ async function guardarRegistroIngreso() {
 // ===========================================
 async function guardarIngresoCompleto() {
     const modal = document.getElementById('modal-ingreso');
-    const cicloId = parseInt(modal.dataset.cicloId);
+    let cicloId = parseInt(modal.dataset.cicloId) || null;
     const reservaId = parseInt(modal.dataset.reservaId) || null;
 
-    if (!cicloId) {
-        alert("Error: no se encontró el ciclo");
-        return;
-    }
-
     try {
-        // 1. Guardar anamnesis
+        // 1. Crear/resolver la sesión de ingreso PRIMERO.
+        //    El backend crea el ciclo si no existe (flujo lazy: el ciclo
+        //    nace recién al guardar, nunca al abrir el modal).
+        if (!sesionActivaId) {
+            const resCrear = await fetch(`${API}/sesiones/crear-ingreso`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ciclo_id: cicloId,
+                    reserva_id: reservaId,
+                    usuario_id: parseInt(usuarioId)
+                })
+            });
+            if (!resCrear.ok) {
+                const err = await resCrear.json().catch(() => ({}));
+                alert(`❌ ${err.detail || 'No se pudo crear la sesión de ingreso.'}`);
+                return;
+            }
+            const creada = await resCrear.json();
+            sesionActivaId = creada.id;
+            if (creada.ciclo_id) {
+                cicloId = creada.ciclo_id;
+                modal.dataset.cicloId = creada.ciclo_id;
+            }
+        }
+
+        // Validación defensiva: a esta altura el ciclo DEBE existir
+        if (!cicloId) {
+            alert("Error: no se pudo determinar el ciclo del ingreso.");
+            return;
+        }
+
+        // 2. Guardar anamnesis (ya con cicloId real)
         await fetch(`${API}/anamnesis/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -473,19 +560,11 @@ async function guardarIngresoCompleto() {
             })
         });
 
-        // 2. Guardar objetivo general
+        // 3. Guardar objetivo general
         await guardarObjetivoGeneral(cicloId);
 
-        // 3. Crear sesión si no existe
-        if (!sesionActivaId) {
-            const resCrear = await fetch(`${API}/sesiones/crear-ingreso`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ciclo_id: cicloId, reserva_id: reservaId })
-            });
-            const creada = await resCrear.json();
-            sesionActivaId = creada.id;
-        }
+        // 3b. Guardar sesiones planificadas (plan terapéutico) — F3
+        await guardarSesionesPlanificadas(cicloId);
 
         // 4. Guardar registro de sesión
         await fetch(`${API}/sesiones/${sesionActivaId}`, {

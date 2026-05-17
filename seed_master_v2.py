@@ -2,11 +2,18 @@
 seed_master_v2.py
 Seed completo del sistema FCE con datos clínicos consistentes.
 Ejecutar después de recrear la BD: python seed_master_v2.py
+
+Incluye sesiones_planificadas (Fase 1 ítem 4) con variedad de escenarios
+visuales para validar la UI:
+  - Plan en curso (X/Y)
+  - Plan completo (Y/Y)
+  - Plan excedido (X>Y)
+  - Sin plan (null)
 """
 
 from database import SessionLocal
-from models import (Usuario, Profesional, BloqueHorario, Reserva, 
-                   Ciclo, Sesion, Objetivo, IndicadorLogro, 
+from models import (Usuario, Profesional, BloqueHorario, Reserva,
+                   Ciclo, Sesion, Objetivo, IndicadorLogro,
                    EvaluacionIndicador, Anamnesis, Diagnostico, Medicamento)
 from datetime import date, timedelta
 import random
@@ -54,7 +61,7 @@ objetivos_data = [
         ]
     },
     {
-        "tipo": "Cognitivo", 
+        "tipo": "Cognitivo",
         "descripcion": "Desarrollar atención sostenida",
         "indicadores": [
             "Mantiene atención en tarea por 10 minutos",
@@ -130,13 +137,18 @@ def crear_anamnesis(ciclo_id, es_nuevo=True):
     )
     db.add(anamnesis)
 
-def crear_ciclo_con_sesiones(usuario_id, num_sesiones, fecha_inicio, estado="cerrado", 
-                              motivo_cierre=None, crear_anam=True):
+def crear_ciclo_con_sesiones(usuario_id, num_sesiones, fecha_inicio, estado="cerrado",
+                              motivo_cierre=None, crear_anam=True, sesiones_planificadas=None):
+    """
+    Crea un ciclo con sus sesiones, bloques horarios y reservas asociadas.
+    Si se pasa sesiones_planificadas, queda registrado como plan terapéutico.
+    """
     ciclo = Ciclo(
         usuario_id=usuario_id,
         profesional_id=profesional.id,
         fecha_inicio=fecha_inicio,
         numero_sesiones=num_sesiones,
+        sesiones_planificadas=sesiones_planificadas,
         estado=estado,
         motivo_cierre=motivo_cierre,
         fecha_cierre=fecha_inicio + timedelta(weeks=num_sesiones+2) if estado == "cerrado" else None
@@ -249,6 +261,15 @@ for u in grupo_a:
 
 # ==========================================
 # GRUPO B — En tratamiento activo (8)
+# Escenarios de plan terapéutico (sesiones_planificadas):
+#   i=0: 3/12        — en curso temprano
+#   i=1: 5/8         — en curso medio
+#   i=2: 4/10        — en curso medio
+#   i=3: 6/6  ✓      — plan completo exacto
+#   i=4: 7/6  ⚠️     — plan excedido
+#   i=5: 3 sin plan  — sin plan definido
+#   i=6: 5 sin plan  — sin plan definido
+#   i=7: 4/4  ✓      — plan completo exacto
 # ==========================================
 print("\n📋 Creando Grupo B (tratamiento activo)...")
 
@@ -263,8 +284,10 @@ grupo_b = [
     {"nombre": "Sebastián Mora",    "rut": "17171717-1", "fecha_nacimiento": date(2017, 6, 8),  "nombre_tutor": "Elena Mora",      "estado": "en_tto"},
 ]
 
-usuarios_b = []
 num_sesiones_b = [3, 5, 4, 6, 7, 3, 5, 4]
+planes_b       = [12, 8, 10, 6, 6, None, None, 4]
+
+usuarios_b = []
 for i, u in enumerate(grupo_b):
     usuario = Usuario(**u)
     db.add(usuario)
@@ -273,14 +296,18 @@ for i, u in enumerate(grupo_b):
     crear_medicamento(usuario.id, i)
     fecha_inicio = date.today() - timedelta(weeks=num_sesiones_b[i]+2)
     crear_ciclo_con_sesiones(
-        usuario.id, num_sesiones_b[i], fecha_inicio, 
-        estado="activo", crear_anam=True
+        usuario.id, num_sesiones_b[i], fecha_inicio,
+        estado="activo", crear_anam=True,
+        sesiones_planificadas=planes_b[i]
     )
     usuarios_b.append(usuario)
-    print(f"  ✅ {u['nombre']} ({num_sesiones_b[i]} sesiones)")
+    plan_label = f"plan: {planes_b[i]}" if planes_b[i] else "sin plan"
+    print(f"  ✅ {u['nombre']} ({num_sesiones_b[i]} sesiones, {plan_label})")
 
 # ==========================================
 # GRUPO C — Inicio nuevo ciclo (8)
+# Cada usuario tiene un ciclo anterior CERRADO + un ciclo nuevo ACTIVO
+# con plan=12 sesiones (escenario típico al iniciar tratamiento).
 # ==========================================
 print("\n📋 Creando Grupo C (inicio nuevo ciclo)...")
 
@@ -303,23 +330,24 @@ for i, u in enumerate(grupo_c):
     crear_diagnostico(usuario.id, i)
     crear_medicamento(usuario.id, i)
     # Ciclo anterior cerrado
-    fecha_ciclo1 = date.today() - timedelta(weeks=random.randint(14,20))
+    fecha_ciclo1 = date.today() - timedelta(weeks=random.randint(14, 20))
     crear_ciclo_con_sesiones(
-        usuario.id, random.randint(8,10), fecha_ciclo1,
+        usuario.id, random.randint(8, 10), fecha_ciclo1,
         estado="cerrado", motivo_cierre="cumplimiento", crear_anam=True
     )
-    # Ciclo nuevo activo sin sesiones
+    # Ciclo nuevo activo sin sesiones, con plan típico de 12
     ciclo_nuevo = Ciclo(
         usuario_id=usuario.id,
         profesional_id=profesional.id,
         fecha_inicio=date.today() - timedelta(days=3),
         numero_sesiones=0,
+        sesiones_planificadas=12,
         estado="activo"
     )
     db.add(ciclo_nuevo)
     db.flush()
     usuarios_c.append(usuario)
-    print(f"  ✅ {u['nombre']} (ciclo anterior cerrado + nuevo ciclo activo)")
+    print(f"  ✅ {u['nombre']} (ciclo anterior cerrado + nuevo ciclo activo 0/12)")
 
 # ==========================================
 # GRUPO D — Ciclos finalizados (6)
@@ -344,7 +372,7 @@ for i, u in enumerate(grupo_d):
     crear_diagnostico(usuario.id, i)
     fecha_ciclo = date.today() - timedelta(weeks=random.randint(20, 40))
     crear_ciclo_con_sesiones(
-        usuario.id, random.randint(8,10), fecha_ciclo,
+        usuario.id, random.randint(8, 10), fecha_ciclo,
         estado="cerrado", motivo_cierre=motivos[i], crear_anam=True
     )
     usuarios_d.append(usuario)
@@ -422,8 +450,8 @@ print("="*50)
 print(f"  → 1 profesional: correo@correo.cl / 1234")
 print(f"  → 30 usuarios en 4 grupos")
 print(f"  → Grupo A: 8 usuarios nuevos sin historial")
-print(f"  → Grupo B: 8 usuarios en tratamiento activo")
-print(f"  → Grupo C: 8 usuarios inicio nuevo ciclo")
+print(f"  → Grupo B: 8 usuarios en tratamiento activo (planes variados)")
+print(f"  → Grupo C: 8 usuarios inicio nuevo ciclo (plan 0/12 cada uno)")
 print(f"  → Grupo D: 6 usuarios con ciclos finalizados")
 print(f"  → Citas: hoy(6), mañana(4), pasado(4), ayer(3), anteayer(2), semana(6)")
 print(f"  → Pendientes sin registrar: 5 (ayer y anteayer)")
